@@ -68,25 +68,13 @@ module register_file #(
 );
 
     reg [DATA_WIDTH-1:0] mem[0:2**ADDR_WIDTH-1];
+    integer i;
 
     always @(posedge clk, posedge reset) begin
         if (reset) begin
-            mem[0] <= 0;
-            mem[1] <= 0;
-            mem[2] <= 0;
-            mem[3] <= 0;
-            mem[4] <= 0;
-            mem[5] <= 0;
-            mem[6] <= 0;
-            mem[7] <= 0;
-            mem[8] <= 0;
-            mem[9] <= 0;
-            mem[10] <= 0;
-            mem[11] <= 0;
-            mem[12] <= 0;
-            mem[13] <= 0;
-            mem[14] <= 0;
-            mem[15] <= 0;
+            for (i = 0; i < 2**ADDR_WIDTH; i = i + 1) begin
+                mem[i] <= 0;
+            end
         end else begin
             if (wr_en) mem[waddr] <= wdata;
         end
@@ -130,7 +118,7 @@ module fifo_control_unit #(
             wr_ptr_reg <= 0;
             rd_ptr_reg <= 0;
             full_reg   <= 1'b0;
-            empty_reg  <= 1'b0;
+            empty_reg  <= 1'b1;
         end else begin
             wr_ptr_reg <= wr_ptr_next;
             rd_ptr_reg <= rd_ptr_next;
@@ -169,10 +157,13 @@ module fifo_control_unit #(
             end
 
             2'b11: begin  // write, read
-                if (empty_reg) begin  // 비어있으면 더이상 진행 X
-                    wr_ptr_next = wr_ptr_reg;
-                    rd_ptr_next = rd_ptr_reg;
-                end else begin  // 비어 있지 않으면 각 포인터 +1
+                if (empty_reg) begin
+                    wr_ptr_next = wr_ptr_reg + 1;
+                    empty_next  = 1'b0;
+                end else if (full_reg) begin
+                    rd_ptr_next = rd_ptr_reg + 1;
+                    full_next   = 1'b0;
+                end else begin
                     wr_ptr_next = wr_ptr_reg + 1;
                     rd_ptr_next = rd_ptr_reg + 1;
                 end

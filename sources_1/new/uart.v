@@ -488,18 +488,18 @@ module transmitter (
     always @(posedge clk, posedge reset) begin
         if (reset) begin
             state            <= IDLE;
-            tx_reg           <= 1'b0;
+            tx_reg           <= 1'b1;
+            tx_done_reg      <= 1'b0;
             br_cnt_reg       <= 0;
             data_bit_cnt_reg <= 0;
             data_tmp_reg     <= 0;
-           // tx_done_reg      <= 1'b0;
         end else begin
             state            <= state_next;
             tx_reg           <= tx_next;
+            tx_done_reg      <= tx_done_next;
             br_cnt_reg       <= br_cnt_next;
             data_bit_cnt_reg <= data_bit_cnt_next;
             data_tmp_reg     <= data_tmp_next;
-            //tx_done_reg      <= tx_done_next;
         end
     end
 
@@ -511,11 +511,11 @@ module transmitter (
         tx_next           = tx_reg;
         br_cnt_next       = br_cnt_reg;
         data_bit_cnt_next = data_bit_cnt_reg;
-       // tx_done_next      = tx_done_reg;
-        //tx_done
+        tx_done_next      = tx_done_reg;
+
         case (state)
             IDLE: begin
-                tx_done_reg = 1'b0;
+                tx_done_next = 1'b0;
                 tx_next      = 1'b1;
 
                 if (start) begin
@@ -561,8 +561,8 @@ module transmitter (
             STOP: begin
                 tx_next = 1'b1;
                 if (br_tick) begin
-                    if (br_cnt_reg == 15) begin 
-                        tx_done_reg = 1'b1;
+                    if (br_cnt_reg == 15) begin
+                        tx_done_next = 1'b1;
                         state_next   = IDLE;
                     end else begin
                         br_cnt_next = br_cnt_reg + 1;
@@ -591,6 +591,8 @@ module receiver (
     reg rx_done_reg, rx_done_next;
     reg [3:0] br_cnt_reg, br_cnt_next; // 
     reg [2:0] data_bit_cnt_reg, data_bit_cnt_next;
+    reg       rx_sync1_reg, rx_sync1_next;
+    reg       rx_sync2_reg, rx_sync2_next;
 
     assign rx_data = rx_data_reg;
     assign rx_done = rx_done_reg;
@@ -602,6 +604,8 @@ module receiver (
             rx_done_reg      <= 1'b0;
             br_cnt_reg       <= 0;
             data_bit_cnt_reg <= 0;
+            rx_sync1_reg     <= 1'b1;
+            rx_sync2_reg     <= 1'b1;
 
 
         end else begin
@@ -610,6 +614,8 @@ module receiver (
             rx_done_reg      <= rx_done_next;
             br_cnt_reg       <= br_cnt_next;
             data_bit_cnt_reg <= data_bit_cnt_next;
+            rx_sync1_reg     <= rx_sync1_next;
+            rx_sync2_reg     <= rx_sync2_next;
         end
 
     end
@@ -620,12 +626,14 @@ module receiver (
         data_bit_cnt_next = data_bit_cnt_reg;
         rx_data_next      = rx_data_reg;
         rx_done_next      = rx_done_reg;
+        rx_sync1_next     = rx;
+        rx_sync2_next     = rx_sync1_reg;
 
         case (state)
 
             IDLE: begin
                 rx_done_next = 1'b0;
-                if (rx == 1'b0) begin
+                if (rx_sync2_reg == 1'b0) begin
                     br_cnt_next       = 0;
                     data_bit_cnt_next = 0;
                     rx_data_next      = 0;
@@ -647,7 +655,7 @@ module receiver (
                 if (br_tick) begin
                     if (br_cnt_reg == 15) begin
                         br_cnt_next  = 0;
-                        rx_data_next = {rx, rx_data_reg[7:1]};  // right shift
+                        rx_data_next = {rx_sync2_reg, rx_data_reg[7:1]};
                         if (data_bit_cnt_reg == 7) begin
                             state_next  = STOP;
                             br_cnt_next = 0;
