@@ -1,109 +1,139 @@
-# Verilog UART + FIFO Loopback
+# UART FIFO Verification Project
 
-## 项目简介
+## 1. Project Overview
 
-这是一个基于 Verilog 的 UART + FIFO 组合小项目，用于练习数字电路设计、RTL 阅读、testbench 编写和基础仿真验证。
+这是一个基于 Verilog 的 UART + FIFO 回环验证项目。项目目标不是只把 GitHub RTL 跑起来，而是把它整理成一个面向数字 IC 验证岗位的作品集项目：有清晰目录、有 testbench、有自动检查、有 FIFO 边界测试、有文档记录。
 
-当前项目已经完成：
-
-- UART 收发模块集成
-- FIFO 读写缓存集成
-- 顶层回环连接
-- Icarus Verilog 仿真
-- GTKWave 波形查看
-- 单字节 UART 回环仿真通过
-
-## 模块结构
-
-### 1. `sources_1/new/uart.v`
-
-包含 UART 的核心模块：
-
-- `baudrate_generator`
-- `transmitter`
-- `receiver`
-
-功能：完成串口发送、接收和波特率节拍产生。
-
-### 2. `sources_1/new/fifo.v`
-
-包含 FIFO 的核心模块：
-
-- `register_file`
-- `fifo_control_unit`
-
-功能：完成数据缓存、读写指针控制、空满状态控制。
-
-### 3. `sources_1/new/uart_fifo.v`
-
-功能：将 UART 与 RX FIFO / TX FIFO 组合，形成串口收发缓存链路。
-
-### 4. `sources_1/new/top_looptest.v`
-
-功能：搭建顶层 loopback 结构，将接收到的数据重新发送出去。
-
-### 5. `sim/uart_fifo_sim/tb_top_loop_test.v`
-
-功能：
-
-- 产生时钟和复位
-- 构造 UART 串行输入激励
-- 从 `tx` 端采样输出数据
-- 自动比对输入输出结果
-- 生成 `vcd` 波形文件
-
-## 当前验证结果
-
-当前已跑通单字节回环场景。
-
-Loopback 验证时，在 GTKWave 中打开 `tb_top_loop_test`，将 `sent_byte` 和 `echoed_byte` 加入波形窗口，并切换为 `Hex` 显示，可直接看到：
-
-- 发送数据：`A5`
-- 接收数据：`A5`
-- PASS
-
-示例结果：
+当前验证结果：
 
 ```text
-RX0=a5 at 2187605000
-PASS: loopback echoed a5
+CHECKED BYTE : 26
+ERROR        : 0
+RESULT       : TEST PASS
 ```
 
-说明：发送 1 个字节 `0xA5` 到 `rx`，经过 UART + FIFO 链路后，`tx` 成功回传相同数据。
+## 2. Architecture
 
-回环验证波形图为 `loopback_pass.png`。
+当前 loopback 数据链路：
 
-## 运行方式
+```text
+UART RX serial input
+        |
+        v
+    UART Receiver
+        |
+        v
+      RX FIFO
+        |
+        v
+  Top Loopback Logic
+        |
+        v
+      TX FIFO
+        |
+        v
+   UART Transmitter
+        |
+        v
+UART TX serial output
+```
 
-在项目根目录执行：
+RTL 入口：
 
-```sh
-iverilog -g2012 -o sim/uart_fifo_sim/uart_fifo_tb.out \
-  sim/uart_fifo_sim/tb_top_loop_test.v \
-  sources_1/new/top_looptest.v \
-  sources_1/new/uart_fifo.v \
-  sources_1/new/uart.v \
-  sources_1/new/fifo.v
+```text
+rtl/uart.v
+rtl/fifo.v
+rtl/uart_fifo.v
+rtl/top_looptest.v
+```
+
+原 Vivado 风格源码仍保留在：
+
+```text
+sources_1/new/
+```
+
+## 3. Verification Environment
+
+验证环境结构：
+
+```text
+tb/tb_top_loop_test.v   # testbench top
+tb/uart_task.vh         # UART driver/monitor tasks
+tb/test_case.vh         # test cases
+tb/scoreboard.vh        # automatic checker
+```
+
+验证思想：
+
+```text
+Testcase
+   |
+UART Driver Task
+   |
+DUT
+   |
+UART Monitor Task
+   |
+Scoreboard
+   |
+PASS / FAIL
+```
+
+## 4. Test Cases
+
+| Test Case | Description | Result |
+| --- | --- | --- |
+| Single byte loopback | Send `0xA5`, receive `0xA5` | PASS |
+| Multi-byte loopback | Send `0x11 0x22 0x33 0x44` | PASS |
+| Stream loopback | Send 20 bytes: `0x00` to `0x13` | PASS |
+| FIFO boundary model | 8 writes trigger full, 8 reads trigger empty | PASS |
+| Reset recovery | Reset then send `0xA5` again | PASS |
+
+## 5. Simulation
+
+Tools:
+
+```text
+Icarus Verilog
+GTKWave
+```
+
+Run simulation from project root:
+
+```bash
+iverilog -g2012 -I tb -o sim/uart_fifo_sim/uart_fifo_tb.out \
+  tb/tb_top_loop_test.v \
+  rtl/top_looptest.v \
+  rtl/uart_fifo.v \
+  rtl/uart.v \
+  rtl/fifo.v
 
 vvp sim/uart_fifo_sim/uart_fifo_tb.out
 ```
 
-查看波形：
+Open waveform:
 
-```sh
+```bash
 gtkwave sim/uart_fifo_sim/tb_top_loop_test.vcd
 ```
 
-## 波形观察重点
+## 6. Learning Notes
 
-建议在 GTKWave 中重点观察这些信号：
+每一步的处理思路都记录在：
 
-- `clk`
-- `reset`
-- `rx`
-- `tx`
-- `dut.U_UART_FIFO.w_rx_done`
-- `dut.U_UART_FIFO.w_tx_done`
-- `dut.U_UART_FIFO.rx_data`
-- `dut.U_UART_FIFO.rx_empty`
+```text
+doc/steps/01_project_structure.md
+doc/steps/02_testbench_split.md
+doc/steps/03_test_cases.md
+doc/steps/04_scoreboard.md
+doc/steps/05_assertion.md
+doc/steps/06_how_to_run.md
+```
+
+## 7. Interview Summary
+
+可以这样介绍这个项目：
+
+> 我基于一个 UART FIFO RTL 搭建了模块级验证环境。验证部分包含 UART 激励生成、TX 端监测、scoreboard 自动比对，以及 FIFO full/empty 边界检查。测试覆盖了单字节、多字节连续传输、20 字节数据流、FIFO 边界和 reset recovery 场景。这个项目的重点是从“能跑 RTL”升级到“能自动验证 RTL”。
 
