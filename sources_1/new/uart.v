@@ -374,6 +374,13 @@
 `timescale 1ns / 1ps
 
 
+// | 变量                 | 作用              |
+// | ------------------ | --------------- |
+// | `br_tick`          | 16倍波特率时钟        |
+// | `br_cnt_reg`       | 当前bit内部计数(0~15) |
+// | `data_bit_cnt_reg` | 当前收到第几个数据位(0~7) |
+
+
 module uart (
 
     input clk,
@@ -391,7 +398,7 @@ module uart (
 
 );
 
-    wire w_br_tick;
+    wire w_br_tick;   
 
     baudrate_generator U_BAUDRATE_GEN (
         .clk(clk),
@@ -459,6 +466,26 @@ module baudrate_generator (
 
         end
     end
+
+    // 단일 always 블록으로 다시 작성한 참고용 버전
+    // reg [$clog2(100_000_000 / 9600 / 16) - 1:0] counter_reg_alt;
+    // reg tick_reg_alt;
+    //
+    // always @(posedge clk, posedge reset) begin
+    //     if (reset) begin
+    //         counter_reg_alt <= 0;
+    //         tick_reg_alt    <= 1'b0;
+    //     end else begin
+    //         tick_reg_alt <= 1'b0;
+    //         // if (counter_reg_alt == 3) begin  // 시뮬레이션용
+    //         if (counter_reg_alt == 100_000_000 / 9600 / 16 - 1) begin
+    //             counter_reg_alt <= 0;
+    //             tick_reg_alt    <= 1'b1;
+    //         end else begin
+    //             counter_reg_alt <= counter_reg_alt + 1;
+    //         end
+    //     end
+    // end
 
 endmodule
 
@@ -572,6 +599,112 @@ module transmitter (
 
         endcase
     end
+
+    // 단일 always 블록으로 다시 작성한 참고용 버전
+    // reg [1:0] state_alt;
+    // reg tx_reg_alt;
+    // reg tx_done_reg_alt;
+    // reg [7:0] data_tmp_reg_alt;
+    // reg [3:0] br_cnt_reg_alt;
+    // reg [2:0] data_bit_cnt_reg_alt;
+    //
+    // always @(posedge clk, posedge reset) begin
+    //     if (reset) begin
+    //         state_alt            <= IDLE;
+    //         tx_reg_alt           <= 1'b1;
+    //         tx_done_reg_alt      <= 1'b0;
+    //         br_cnt_reg_alt       <= 0;
+    //         data_bit_cnt_reg_alt <= 0;
+    //         data_tmp_reg_alt     <= 0;
+    //     end else begin
+    //         case (state_alt)
+    //             IDLE: begin
+    //                 state_alt            <= state_alt;
+    //                 tx_reg_alt           <= 1'b1;
+    //                 tx_done_reg_alt      <= 1'b0;
+    //                 br_cnt_reg_alt       <= br_cnt_reg_alt;
+    //                 data_bit_cnt_reg_alt <= data_bit_cnt_reg_alt;
+    //                 data_tmp_reg_alt     <= data_tmp_reg_alt;
+    //
+    //                 if (start) begin
+    //                     state_alt            <= START;
+    //                     data_tmp_reg_alt     <= tx_data;
+    //                     br_cnt_reg_alt       <= 0;
+    //                     data_bit_cnt_reg_alt <= 0;
+    //                 end
+    //             end
+    //
+    //             START: begin
+    //                 state_alt            <= state_alt;
+    //                 tx_reg_alt           <= 1'b0;
+    //                 tx_done_reg_alt      <= tx_done_reg_alt;
+    //                 br_cnt_reg_alt       <= br_cnt_reg_alt;
+    //                 data_bit_cnt_reg_alt <= data_bit_cnt_reg_alt;
+    //                 data_tmp_reg_alt     <= data_tmp_reg_alt;
+    //
+    //                 if (br_tick) begin
+    //                     if (br_cnt_reg_alt == 15) begin
+    //                         state_alt      <= DATA;
+    //                         br_cnt_reg_alt <= 0;
+    //                     end else begin
+    //                         br_cnt_reg_alt <= br_cnt_reg_alt + 1;
+    //                     end
+    //                 end
+    //             end
+    //
+    //             DATA: begin
+    //                 state_alt            <= state_alt;
+    //                 tx_reg_alt           <= data_tmp_reg_alt[0];
+    //                 tx_done_reg_alt      <= tx_done_reg_alt;
+    //                 br_cnt_reg_alt       <= br_cnt_reg_alt;
+    //                 data_bit_cnt_reg_alt <= data_bit_cnt_reg_alt;
+    //                 data_tmp_reg_alt     <= data_tmp_reg_alt;
+    //
+    //                 if (br_tick) begin
+    //                     if (br_cnt_reg_alt == 15) begin
+    //                         if (data_bit_cnt_reg_alt == 7) begin
+    //                             state_alt      <= STOP;
+    //                             br_cnt_reg_alt <= 0;
+    //                         end else begin
+    //                             data_bit_cnt_reg_alt <= data_bit_cnt_reg_alt + 1;
+    //                             data_tmp_reg_alt <= {1'b0, data_tmp_reg_alt[7:1]};
+    //                             br_cnt_reg_alt <= 0;
+    //                         end
+    //                     end else begin
+    //                         br_cnt_reg_alt <= br_cnt_reg_alt + 1;
+    //                     end
+    //                 end
+    //             end
+    //
+    //             STOP: begin
+    //                 state_alt            <= state_alt;
+    //                 tx_reg_alt           <= 1'b1;
+    //                 tx_done_reg_alt      <= tx_done_reg_alt;
+    //                 br_cnt_reg_alt       <= br_cnt_reg_alt;
+    //                 data_bit_cnt_reg_alt <= data_bit_cnt_reg_alt;
+    //                 data_tmp_reg_alt     <= data_tmp_reg_alt;
+    //
+    //                 if (br_tick) begin
+    //                     if (br_cnt_reg_alt == 15) begin
+    //                         tx_done_reg_alt <= 1'b1;
+    //                         state_alt       <= IDLE;
+    //                     end else begin
+    //                         br_cnt_reg_alt <= br_cnt_reg_alt + 1;
+    //                     end
+    //                 end
+    //             end
+    //
+    //             default: begin
+    //                 state_alt            <= IDLE;
+    //                 tx_reg_alt           <= 1'b1;
+    //                 tx_done_reg_alt      <= 1'b0;
+    //                 br_cnt_reg_alt       <= 0;
+    //                 data_bit_cnt_reg_alt <= 0;
+    //                 data_tmp_reg_alt     <= 0;
+    //             end
+    //         endcase
+    //     end
+    // end
 endmodule
 
 
@@ -606,8 +739,6 @@ module receiver (
             data_bit_cnt_reg <= 0;
             rx_sync1_reg     <= 1'b1;
             rx_sync2_reg     <= 1'b1;
-
-
         end else begin
             state            <= state_next;
             rx_data_reg      <= rx_data_next;
@@ -617,7 +748,6 @@ module receiver (
             rx_sync1_reg     <= rx_sync1_next;
             rx_sync2_reg     <= rx_sync2_next;
         end
-
     end
 
     always @(*) begin
@@ -630,7 +760,6 @@ module receiver (
         rx_sync2_next     = rx_sync1_reg;
 
         case (state)
-
             IDLE: begin
                 rx_done_next = 1'b0;
                 if (rx_sync2_reg == 1'b0) begin
@@ -651,6 +780,7 @@ module receiver (
                     end
                 end
             end
+
             DATA: begin
                 if (br_tick) begin
                     if (br_cnt_reg == 15) begin
@@ -661,29 +791,131 @@ module receiver (
                             br_cnt_next = 0;
                         end else begin
                             data_bit_cnt_next = data_bit_cnt_reg + 1;
-
                         end
                     end else begin
                         br_cnt_next = br_cnt_reg + 1;
-
                     end
                 end
-
             end
+
             STOP: begin
                 if (br_tick) begin
                     if (br_cnt_reg == 15) begin
                         br_cnt_next  = 0;
                         rx_done_next = 1'b1;
                         state_next   = IDLE;
-
                     end else begin
                         br_cnt_next = br_cnt_reg + 1;
                     end
                 end
             end
-
         endcase
     end
+
+    // 单一时序 always 块写法参考版本，使用 _alt 寄存器避免与上面的正式逻辑冲突。
+    // reg [1:0] state_alt;
+    // reg [7:0] rx_data_reg_alt;
+    // reg rx_done_reg_alt;
+    // reg [3:0] br_cnt_reg_alt;
+    // reg [2:0] data_bit_cnt_reg_alt;
+    // reg rx_sync1_reg_alt;
+    // reg rx_sync2_reg_alt;
+    //
+    // always @(posedge clk, posedge reset) begin
+    //     if (reset) begin
+    //         state_alt            <= IDLE;
+    //         rx_data_reg_alt      <= 0;
+    //         rx_done_reg_alt      <= 1'b0;
+    //         br_cnt_reg_alt       <= 0;
+    //         data_bit_cnt_reg_alt <= 0;
+    //         rx_sync1_reg_alt     <= 1'b1;
+    //         rx_sync2_reg_alt     <= 1'b1;
+    //     end else begin
+    //         rx_sync1_reg_alt <= rx;
+    //         rx_sync2_reg_alt <= rx_sync1_reg_alt;
+    //
+    //         case (state_alt)
+    //             IDLE: begin
+    //                 state_alt            <= state_alt;
+    //                 rx_data_reg_alt      <= rx_data_reg_alt;
+    //                 rx_done_reg_alt      <= 1'b0;
+    //                 br_cnt_reg_alt       <= br_cnt_reg_alt;
+    //                 data_bit_cnt_reg_alt <= data_bit_cnt_reg_alt;
+    //
+    //                 if (rx_sync2_reg_alt == 1'b0) begin
+    //                     state_alt            <= START;
+    //                     br_cnt_reg_alt       <= 0;
+    //                     data_bit_cnt_reg_alt <= 0;
+    //                     rx_data_reg_alt      <= 0;
+    //                 end
+    //             end
+    //
+    //             START: begin
+    //                 state_alt            <= state_alt;
+    //                 rx_data_reg_alt      <= rx_data_reg_alt;
+    //                 rx_done_reg_alt      <= rx_done_reg_alt;
+    //                 br_cnt_reg_alt       <= br_cnt_reg_alt;
+    //                 data_bit_cnt_reg_alt <= data_bit_cnt_reg_alt;
+    //
+    //                 if (br_tick) begin
+    //                     if (br_cnt_reg_alt == 7) begin
+    //                         state_alt      <= DATA;
+    //                         br_cnt_reg_alt <= 0;
+    //                     end else begin
+    //                         br_cnt_reg_alt <= br_cnt_reg_alt + 1;
+    //                     end
+    //                 end
+    //             end
+    //
+    //             DATA: begin
+    //                 state_alt            <= state_alt;
+    //                 rx_data_reg_alt      <= rx_data_reg_alt;
+    //                 rx_done_reg_alt      <= rx_done_reg_alt;
+    //                 br_cnt_reg_alt       <= br_cnt_reg_alt;
+    //                 data_bit_cnt_reg_alt <= data_bit_cnt_reg_alt;
+    //
+    //                 if (br_tick) begin
+    //                     if (br_cnt_reg_alt == 15) begin
+    //                         br_cnt_reg_alt  <= 0;
+    //                         rx_data_reg_alt <= {rx_sync2_reg_alt, rx_data_reg_alt[7:1]};
+    //                         if (data_bit_cnt_reg_alt == 7) begin
+    //                             state_alt <= STOP;
+    //                         end else begin
+    //                             data_bit_cnt_reg_alt <= data_bit_cnt_reg_alt + 1;
+    //                         end
+    //                     end else begin
+    //                         br_cnt_reg_alt <= br_cnt_reg_alt + 1;
+    //                     end
+    //                 end
+    //             end
+    //
+    //             STOP: begin
+    //                 state_alt            <= state_alt;
+    //                 rx_data_reg_alt      <= rx_data_reg_alt;
+    //                 rx_done_reg_alt      <= rx_done_reg_alt;
+    //                 br_cnt_reg_alt       <= br_cnt_reg_alt;
+    //                 data_bit_cnt_reg_alt <= data_bit_cnt_reg_alt;
+    //
+    //                 if (br_tick) begin
+    //                     if (br_cnt_reg_alt == 15) begin
+    //                         state_alt       <= IDLE;
+    //                         rx_done_reg_alt <= 1'b1;
+    //                         br_cnt_reg_alt  <= 0;
+    //                     end else begin
+    //                         br_cnt_reg_alt <= br_cnt_reg_alt + 1;
+    //                     end
+    //                 end
+    //             end
+    //
+    //             default: begin
+    //                 state_alt            <= IDLE;
+    //                 rx_data_reg_alt      <= 0;
+    //                 rx_done_reg_alt      <= 1'b0;
+    //                 br_cnt_reg_alt       <= 0;
+    //                 data_bit_cnt_reg_alt <= 0;
+    //             end
+    //         endcase
+    //     end
+    // end
 
 endmodule

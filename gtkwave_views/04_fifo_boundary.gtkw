@@ -1,0 +1,16 @@
+[*] GTKWave signal view: FIFO full and empty boundary test
+[dumpfile] "/Users/athena/Desktop/myself/testDataIC/Verilog_UART_FIFO_0524/sim/uart_fifo_sim/tb_top_loop_test.vcd"
+[timestart] 84680000000
+*84680000000.000000 84683100000.000000
+@28
+tb_top_loop_test.clk
+tb_top_loop_test.fifo_boundary_model_reset
+tb_top_loop_test.fifo_boundary_model_wr_en
+tb_top_loop_test.fifo_boundary_model_rd_en
+tb_top_loop_test.fifo_boundary_model_full
+tb_top_loop_test.fifo_boundary_model_empty
+@22
+tb_top_loop_test.fifo_boundary_model_wdata[7:0]
+tb_top_loop_test.fifo_boundary_model_rdata[7:0]
+tb_top_loop_test.fifo_boundary_model.U_FIFO_CU.wr_ptr_reg[2:0]
+tb_top_loop_test.fifo_boundary_model.U_FIFO_CU.rd_ptr_reg[2:0]

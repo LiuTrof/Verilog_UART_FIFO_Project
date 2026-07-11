@@ -1,0 +1,14 @@
+[*] GTKWave signal view: single byte loopback (A5)
+[dumpfile] "/Users/athena/Desktop/myself/testDataIC/Verilog_UART_FIFO_0524/sim/uart_fifo_sim/tb_top_loop_test.vcd"
+[timestart] 0
+*0.000000 2400000000.000000
+@28
+tb_top_loop_test.clk
+tb_top_loop_test.reset
+tb_top_loop_test.rx
+tb_top_loop_test.tx
+tb_top_loop_test.dut.U_UART_FIFO.w_rx_done
+tb_top_loop_test.dut.U_UART_FIFO.w_tx_done
+@22
+tb_top_loop_test.dut.U_UART_FIFO.w_rx_data[7:0]
+tb_top_loop_test.dut.U_UART_FIFO.w_tx_fifo_rdata[7:0]
