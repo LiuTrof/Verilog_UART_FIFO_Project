@@ -12,6 +12,9 @@ module tb_top_loop_test;
     reg rx = 1'b1;
     wire tx;
 
+    reg [7:0] driver_data = 8'h00;
+    reg [7:0] monitor_data = 8'h00;
+
     reg fifo_boundary_model_reset = 1'b1;
     reg fifo_boundary_model_wr_en = 1'b0;
     reg fifo_boundary_model_rd_en = 1'b0;
@@ -44,7 +47,8 @@ module tb_top_loop_test;
     always #(CLK_PERIOD_NS / 2) clk = ~clk;
 
     `include "scoreboard.vh"
-    `include "uart_task.vh"
+    `include "driver/uart_driver.vh"
+    `include "monitor/uart_monitor.vh"
     `include "test_case.vh"
 
     always @(posedge clk) begin
@@ -67,17 +71,24 @@ module tb_top_loop_test;
     end
 
     initial begin
-        $dumpfile("sim/uart_fifo_sim/tb_top_loop_test.vcd");
-        $dumpvars(0, tb_top_loop_test);
+        reg [8*256-1:0] vcd_file;
+        if ($value$plusargs("VCD=%s", vcd_file)) begin
+            $dumpfile(vcd_file);
+            $dumpvars(0, clk, reset, rx, tx);
+            $dumpvars(0, driver_data, monitor_data);
+            $dumpvars(0, dut.U_UART_FIFO.w_rx_done, dut.U_UART_FIFO.w_tx_done,
+                      dut.U_UART_FIFO.rx_data, dut.U_UART_FIFO.rx_empty,
+                      dut.U_UART_FIFO.U_Rx_Fifo.full, dut.U_UART_FIFO.U_Rx_Fifo.empty,
+                      dut.U_UART_FIFO.U_Tx_Fifo.full, dut.U_UART_FIFO.U_Tx_Fifo.empty);
+            $dumpvars(0, fifo_boundary_model_reset, fifo_boundary_model_wr_en,
+                      fifo_boundary_model_rd_en, fifo_boundary_model_wdata,
+                      fifo_boundary_model_full, fifo_boundary_model_empty,
+                      fifo_boundary_model_rdata);
+        end
 
         scoreboard_reset();
-        apply_reset();
-
-        test_single_byte();
-        test_multi_byte();
-        test_fifo_stream();
-        test_rx_fifo_fill_level();
-        test_reset_recovery();
+        uart_driver_apply_reset();
+        run_selected_test();
 
         scoreboard_report();
 

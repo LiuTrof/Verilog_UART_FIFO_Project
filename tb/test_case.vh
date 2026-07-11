@@ -6,20 +6,17 @@ task run_loopback_sequence;
     input integer pattern;
     integer idx;
     integer rx_idx;
-    reg [7:0] expected_data;
     reg [7:0] actual_data;
     begin
         fork
             begin
                 for (idx = 0; idx < length; idx = idx + 1) begin
-                    expected_data = get_test_data(idx, pattern);
-                    send_uart_byte(expected_data);
+                    uart_driver_send_byte(get_test_data(idx, pattern));
                 end
             end
             begin
                 for (rx_idx = 0; rx_idx < length; rx_idx = rx_idx + 1) begin
-                    receive_uart_byte(actual_data);
-                    scoreboard_check(get_test_data(rx_idx, pattern), actual_data);
+                    uart_monitor_receive_byte(actual_data);
                 end
             end
         join
@@ -30,18 +27,15 @@ task run_safe_loopback_sequence;
     input integer length;
     input integer pattern;
     integer idx;
-    reg [7:0] expected_data;
     reg [7:0] actual_data;
     begin
         for (idx = 0; idx < length; idx = idx + 1) begin
-            expected_data = get_test_data(idx, pattern);
             fork
                 begin
-                    send_uart_byte(expected_data);
+                    uart_driver_send_byte(get_test_data(idx, pattern));
                 end
                 begin
-                    receive_uart_byte(actual_data);
-                    scoreboard_check(expected_data, actual_data);
+                    uart_monitor_receive_byte(actual_data);
                 end
             join
 
@@ -87,7 +81,7 @@ endtask
 task test_multi_byte;
     begin
         $display("\n[TEST] multi byte loopback: 11 22 33 44");
-        apply_reset();
+        uart_driver_apply_reset();
         run_safe_loopback_sequence(4, 1);
     end
 endtask
@@ -95,7 +89,7 @@ endtask
 task test_fifo_stream;
     begin
         $display("\n[TEST] stream loopback: 20 bytes 00..13");
-        apply_reset();
+        uart_driver_apply_reset();
         run_safe_loopback_sequence(20, 2);
     end
 endtask
@@ -146,8 +140,39 @@ endtask
 task test_reset_recovery;
     begin
         $display("\n[TEST] reset recovery");
-        apply_reset();
+        uart_driver_apply_reset();
         run_safe_loopback_sequence(1, 0);
+    end
+endtask
+
+task run_selected_test;
+    reg [8*16-1:0] selected_test;
+    begin
+        if (!$value$plusargs("TEST=%s", selected_test)) begin
+            selected_test = "all";
+        end
+
+        $display("[TEST] selected=%0s", selected_test);
+        if (selected_test == "single") begin
+            test_single_byte();
+        end else if (selected_test == "multi") begin
+            test_multi_byte();
+        end else if (selected_test == "stream") begin
+            test_fifo_stream();
+        end else if (selected_test == "fifo") begin
+            test_rx_fifo_fill_level();
+        end else if (selected_test == "reset") begin
+            test_reset_recovery();
+        end else if (selected_test == "all") begin
+            test_single_byte();
+            test_multi_byte();
+            test_fifo_stream();
+            test_rx_fifo_fill_level();
+            test_reset_recovery();
+        end else begin
+            total_errors = total_errors + 1;
+            $display("[TEST][FAIL] unsupported TEST=%0s", selected_test);
+        end
     end
 endtask
 

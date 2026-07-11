@@ -1,6 +1,6 @@
 `ifndef UART_TASK_VH
 `define UART_TASK_VH
-//UART 发送/接收 task
+// Legacy compatibility tasks. New tests use tb/driver and tb/monitor.
 task send_uart_byte;
     input [7:0] data;
     integer bit_idx;

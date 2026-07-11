@@ -1,11 +1,11 @@
 # GTKWave Scenario Views
 
-This folder contains five GTKWave save files (`.gtkw`). Each save file opens the
-project waveform and automatically loads only the essential signals for one
-test scenario. The RTL and testbench files are not modified.
+This folder contains five GTKWave save files (`.gtkw`). Each save file opens its
+own scenario VCD and automatically loads only the signals needed for that
+scenario. The DUT RTL is not modified.
 
-Before opening a view, run `./build.sh` from the project root so the VCD waveform
-is regenerated at `sim/uart_fifo_sim/tb_top_loop_test.vcd`.
+Use `./run.sh <scenario> --wave` or the launcher below. The selected simulation
+is rerun first so its VCD always matches the current testbench structure.
 
 ## Open a Scenario
 
@@ -19,14 +19,22 @@ In GTKWave, select **File -> Read Save File** and choose one of these files:
 | `04_fifo_boundary.gtkw` | FIFO writes to full, then reads to empty |
 | `05_reset_recovery.gtkw` | Reset followed by another `A5` loopback |
 
-You can also double-click a `.gtkw` file in Finder when GTKWave is associated
-with the extension, or run it from the project root:
+Each view starts at time zero because every scenario now has an independent VCD.
 
-```bash
-gtkwave --save gtkwave_views/01_single_byte_loopback.gtkw
-```
+## Signals Shown
 
-Each view also starts at the approximate simulation time for that test case.
+Each view deliberately contains only the signals needed to judge its scenario:
+
+| View | Signals used to judge the scenario |
+| --- | --- |
+| Single byte | `rx`, `tx`, RX/TX done pulses, `driver_data`, `monitor_data` |
+| Multi byte | `rx`, `tx`, RX/TX done pulses, `driver_data`, `monitor_data` |
+| Stream | `rx`, `tx`, `driver_data`, `monitor_data` |
+| FIFO boundary | FIFO reset, write/read enables, `full`, `empty`, write data |
+| Reset recovery | `reset`, `rx`, `tx`, RX/TX done pulses, `driver_data`, `monitor_data` |
+
+Signals that do not directly support a scenario's pass criteria are intentionally
+excluded to keep the waveform focused.
 
 ## Switching Views
 
@@ -36,8 +44,8 @@ first click the signal-name pane, then use **Edit -> Highlight All** followed by
 **Edit -> Delete**. After the list is empty, use **File -> Read Save File** to
 load the next scenario.
 
-For a clean, one-command launch that always opens exactly one scenario view in
-a new GTKWave window, use the included launcher from the project root:
+For a clean, one-command launch that reruns one scenario and opens exactly its
+matching view, use the included launcher from the project root:
 
 ```bash
 ./gtkwave_views/open_view.sh 1

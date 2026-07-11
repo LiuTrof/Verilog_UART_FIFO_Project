@@ -1,0 +1,9 @@
+# Generated Icarus Verilog artifacts
+sim/uart_fifo_sim/*.out
+sim/uart_fifo_sim/*.vcd
+sim/uart_fifo_sim/log/
+simv
+
+# macOS Finder metadata
+.DS_Store
+png/.DS_Store
