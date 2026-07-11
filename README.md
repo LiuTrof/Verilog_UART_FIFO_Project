@@ -165,8 +165,6 @@ Waveform export is optional because writing every clock transition makes long
 regressions unnecessarily slow. Use `--wave` for focused debug; use `all` for
 the normal self-checking regression.
 
-`build.sh` remains available as the original full build entry point.
-
 ## 7. Learning Notes
 
 每一步的处理思路都记录在：

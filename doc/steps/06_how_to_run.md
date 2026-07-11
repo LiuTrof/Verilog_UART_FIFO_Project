@@ -2,31 +2,35 @@
 
 ## 运行命令
 
-在 `Verilog_UART_FIFO_0524` 目录下执行：
+在 `Verilog_UART_FIFO_0524` 目录下使用统一入口：
 
 ```bash
-iverilog -g2012 -I tb -o sim/uart_fifo_sim/uart_fifo_tb.out \
-  tb/tb_top_loop_test.v \
-  rtl/top_looptest.v \
-  rtl/uart_fifo.v \
-  rtl/uart.v \
-  rtl/fifo.v
-
-vvp sim/uart_fifo_sim/uart_fifo_tb.out
+./run.sh single
+./run.sh multi
+./run.sh stream
+./run.sh fifo
+./run.sh reset
+./run.sh all
 ```
 
 ## 查看波形
 
-仿真会生成：
-
-```text
-sim/uart_fifo_sim/tb_top_loop_test.vcd
-```
-
-用 GTKWave 打开：
+为单个场景生成并打开波形：
 
 ```bash
-gtkwave sim/uart_fifo_sim/tb_top_loop_test.vcd
+./run.sh multi --wave
+```
+
+也可以使用 GTKWave 场景启动脚本：
+
+```bash
+./gtkwave_views/open_view.sh 2
+```
+
+日志会生成在：
+
+```text
+sim/uart_fifo_sim/log/<场景名>.log
 ```
 
 ## 本次验证结果
@@ -42,4 +46,3 @@ RESULT       : TEST PASS
 ## 小白要记住的点
 
 每次改 testbench 或 RTL 后，都要重新编译和运行。验证工程师的基本动作是：修改、仿真、看 log、必要时看波形。
-
