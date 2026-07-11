@@ -1,7 +1,45 @@
-[*] GTKWave signal view: multi-byte UART loopback (11 22 33 44)
+[*]
+[*] GTKWave Analyzer v3.4.0 (w)1999-2022 BSI
+[*] Sat Jul 11 15:29:15 2026
+[*]
 [dumpfile] "/Users/athena/Desktop/myself/testDataIC/Verilog_UART_FIFO_0524/sim/uart_fifo_sim/multi.vcd"
+[dumpfile_mtime] "Sat Jul 11 15:29:00 2026"
+[dumpfile_size] 43446914
+[savefile] "/Users/athena/Desktop/myself/testDataIC/Verilog_UART_FIFO_0524/gtkwave_views/02_multi_byte_loopback.gtkw"
 [timestart] 0
-*0.000000 14500000000.000000
+[size] 1770 825
+[pos] 173 50
+*-31.000000 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+[markername] AA
+[markername] BB
+[markername] CC
+[markername] DD
+[markername] EE
+[markername] FF
+[markername] GG
+[markername] HH
+[markername] II
+[markername] JJ
+[markername] KK
+[markername] LL
+[markername] MM
+[markername] NN
+[markername] OO
+[markername] PP
+[markername] QQ
+[markername] RR
+[markername] SS
+[markername] TT
+[markername] UU
+[markername] VV
+[markername] WW
+[markername] XX
+[markername] YY
+[markername] ZZ
+[sst_width] 255
+[signals_width] 170
+[sst_expanded] 1
+[sst_vpaned_height] 238
 @28
 tb_top_loop_test.rx
 tb_top_loop_test.tx
@@ -10,3 +48,5 @@ tb_top_loop_test.dut.U_UART_FIFO.w_tx_done
 @22
 tb_top_loop_test.driver_data[7:0]
 tb_top_loop_test.monitor_data[7:0]
+[pattern_trace] 1
+[pattern_trace] 0

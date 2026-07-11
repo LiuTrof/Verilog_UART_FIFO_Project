@@ -2,7 +2,7 @@
 
 ## 1. Project Overview
 
-这是一个基于 Verilog 的 UART + FIFO 回环验证项目。项目目标不是只把 GitHub RTL 跑起来，而是把它整理成一个面向数字 IC 验证岗位的作品集项目：有清晰目录、有 testbench、有自动检查、有 FIFO 边界测试、有文档记录。
+这是一个基于 Verilog 的 UART + FIFO 回环验证项目。项目目标不是只把 GitHub RTL 跑起来，而是把它整理成一个面向数字 IC 验证岗位的项目：有清晰目录、有 testbench、有自动检查、有 FIFO 边界测试、有文档记录。
 
 当前验证结果：
 
@@ -110,26 +110,26 @@ or fail.
 
 The detailed plan is in [`doc/verification_plan.md`](doc/verification_plan.md).
 
-| Scenario | Purpose | Stimulus | Main checks |
-| --- | --- | --- |
-| `single` | Basic UART loopback | `A5` | `tx` equals `rx` byte |
-| `multi` | Ordered multi-byte loopback | `11 22 33 44` | No loss or reordering |
-| `stream` | Sequential streaming | `00` through `13` | 20 ordered matches |
-| `fifo` | FIFO boundary model | 8 writes, then 8 reads | `full`, then `empty` |
-| `reset` | Reset recovery | reset, then `A5` | Normal loopback resumes |
-| `all` | Full regression | All scenarios | Zero errors, empty expected queue |
+| Scenario | Purpose                     | Stimulus               | Main checks                       |
+| -------- | --------------------------- | ---------------------- | --------------------------------- |
+| `single` | Basic UART loopback         | `A5`                   | `tx` equals `rx` byte             |
+| `multi`  | Ordered multi-byte loopback | `11 22 33 44`          | No loss or reordering             |
+| `stream` | Sequential streaming        | `00` through `13`      | 20 ordered matches                |
+| `fifo`   | FIFO boundary model         | 8 writes, then 8 reads | `full`, then `empty`              |
+| `reset`  | Reset recovery              | reset, then `A5`       | Normal loopback resumes           |
+| `all`    | Full regression             | All scenarios          | Zero errors, empty expected queue |
 
 ## 5. Interfaces
 
-| Interface | Direction | Description |
-| --- | --- | --- |
-| `clk` | input | 100 MHz design clock used by RTL and testbench. |
-| `reset` | input | Active-high reset. |
-| `rx` | input | UART serial input driven by the verification driver. |
-| `tx` | output | UART serial output decoded by the verification monitor. |
-| `wr_en` / `rd_en` | FIFO control | Write/read enables used by the FIFO boundary model. |
-| `full` / `empty` | FIFO status | FIFO flow-control state checked in the boundary test. |
-| `wdata` / `rdata` | FIFO data | FIFO write/read data paths. |
+| Interface         | Direction    | Description                                             |
+| ----------------- | ------------ | ------------------------------------------------------- |
+| `clk`             | input        | 100 MHz design clock used by RTL and testbench.         |
+| `reset`           | input        | Active-high reset.                                      |
+| `rx`              | input        | UART serial input driven by the verification driver.    |
+| `tx`              | output       | UART serial output decoded by the verification monitor. |
+| `wr_en` / `rd_en` | FIFO control | Write/read enables used by the FIFO boundary model.     |
+| `full` / `empty`  | FIFO status  | FIFO flow-control state checked in the boundary test.   |
+| `wdata` / `rdata` | FIFO data    | FIFO write/read data paths.                             |
 
 ## 6. Simulation
 
@@ -176,6 +176,7 @@ doc/steps/03_test_cases.md
 doc/steps/04_scoreboard.md
 doc/steps/05_assertion.md
 doc/steps/06_how_to_run.md
+doc/waveform_causality.md
 ```
 
 ## 8. Interview Summary
