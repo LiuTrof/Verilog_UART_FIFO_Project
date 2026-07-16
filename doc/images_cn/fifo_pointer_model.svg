@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="500" viewBox="0 0 1440 500" role="img" aria-labelledby="title desc">
+  <title id="title">FIFO 存储与指针控制</title>
+  <desc id="desc">包含写指针、读指针、存储阵列及满空状态规则的八深度 FIFO。</desc>
+  <defs><marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 z" fill="#26547c"/></marker><style>.title{font:700 28px Arial,sans-serif;fill:#102a43}.text{font:15px Arial,sans-serif;fill:#243b53}.small{font:13px Arial,sans-serif;fill:#486581}.label{font:700 16px Arial,sans-serif;fill:#102a43}.line{stroke:#26547c;stroke-width:3;fill:none;marker-end:url(#arrow)}</style></defs>
+  <rect width="1440" height="500" fill="#f7fafc"/><text x="60" y="54" class="title">FIFO = 存储阵列 + 读写指针控制</text>
+  <rect x="530" y="135" width="560" height="176" rx="10" fill="#fff" stroke="#b7791f" stroke-width="3"/>
+  <text x="810" y="170" class="label" text-anchor="middle">register_file：8 项 x 8 位</text>
+  <g><rect x="570" y="205" width="55" height="65" fill="#fff5d6" stroke="#b7791f"/><rect x="625" y="205" width="55" height="65" fill="#fff5d6" stroke="#b7791f"/><rect x="680" y="205" width="55" height="65" fill="#fff5d6" stroke="#b7791f"/><rect x="735" y="205" width="55" height="65" fill="#fff5d6" stroke="#b7791f"/><rect x="790" y="205" width="55" height="65" fill="#fff5d6" stroke="#b7791f"/><rect x="845" y="205" width="55" height="65" fill="#fff5d6" stroke="#b7791f"/><rect x="900" y="205" width="55" height="65" fill="#fff5d6" stroke="#b7791f"/><rect x="955" y="205" width="55" height="65" fill="#fff5d6" stroke="#b7791f"/></g>
+  <g class="small" text-anchor="middle"><text x="597" y="292">0</text><text x="652" y="292">1</text><text x="707" y="292">2</text><text x="762" y="292">3</text><text x="817" y="292">4</text><text x="872" y="292">5</text><text x="927" y="292">6</text><text x="982" y="292">7</text></g>
+  <rect x="70" y="160" width="270" height="130" rx="10" fill="#e6fffa" stroke="#319795" stroke-width="3"/><text x="205" y="197" class="label" text-anchor="middle">fifo_control_unit</text><text x="205" y="226" class="text" text-anchor="middle">wr_ptr / rd_ptr</text><text x="205" y="250" class="text" text-anchor="middle">full / empty 标志</text><text x="205" y="272" class="small" text-anchor="middle">每个 clk 上升沿更新</text>
+  <path d="M340 202 H530" class="line"/><text x="435" y="188" class="small" text-anchor="middle">waddr、raddr</text><path d="M340 255 H530" class="line"/>
+  <path d="M70 355 H305" class="line"/><text x="70" y="343" class="small">wr_en + wdata</text><path d="M1090 355 H1325" class="line"/><text x="1120" y="343" class="small">rdata</text>
+  <text x="70" y="425" class="label">本实现的状态规则</text><text x="70" y="452" class="text">复位：empty=1、full=0。有效写入使 wr_ptr 前进；有效读取使 rd_ptr 前进。满时写、空时读均会被忽略。</text><text x="70" y="477" class="text">读写使能同时为高：空状态只接受写；满状态只接受读；非空非满时两个指针均前进。</text>
+</svg>

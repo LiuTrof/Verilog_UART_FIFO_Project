@@ -1,0 +1,157 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="980" viewBox="0 0 1600 980" role="img" aria-labelledby="title desc">
+  <title id="title">top_loop_test UART FIFO 回环 RTL 端口连接图</title>
+  <desc id="desc">top_loop_test 实例化 uart_fifo。图中给出顶层 rx、tx、clk、reset 端口，RX FIFO 到 TX FIFO 的回环控制信号，以及 uart_fifo 内部 UART、RX FIFO 和 TX FIFO 的实际连接关系。</desc>
+  <defs>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#176b87"/></marker>
+    <marker id="arrow-orange" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#b45309"/></marker>
+    <style>
+      .title { font: 700 30px Arial, PingFang SC, sans-serif; fill: #172033; }
+      .sub { font: 16px Arial, PingFang SC, sans-serif; fill: #425466; }
+      .module { font: 700 20px Arial, PingFang SC, sans-serif; fill: #172033; }
+      .instance { font: 700 16px Arial, PingFang SC, sans-serif; fill: #172033; }
+      .label { font: 15px Arial, PingFang SC, sans-serif; fill: #26384a; }
+      .small { font: 13px Arial, PingFang SC, sans-serif; fill: #425466; }
+      .port { font: 14px Arial, PingFang SC, sans-serif; fill: #172033; }
+      .outer { fill: #ffffff; stroke: #172033; stroke-width: 2.4; }
+      .wrap { fill: #f8fbfd; stroke: #176b87; stroke-width: 2.2; }
+      .block { fill: #ffffff; stroke: #38566c; stroke-width: 1.8; }
+      .logic { fill: #fff8ed; stroke: #b45309; stroke-width: 2; }
+      .data { stroke: #176b87; stroke-width: 3; fill: none; marker-end: url(#arrow-blue); }
+      .control { stroke: #b45309; stroke-width: 2.4; fill: none; marker-end: url(#arrow-orange); }
+      .status { stroke: #6b7280; stroke-width: 2; stroke-dasharray: 7 5; fill: none; marker-end: url(#arrow-blue); }
+      .bus { stroke: #176b87; stroke-width: 5; fill: none; marker-end: url(#arrow-blue); }
+      .guide { stroke: #9db2c3; stroke-width: 1.2; fill: none; stroke-dasharray: 4 4; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="980" fill="#ffffff"/>
+  <text x="70" y="53" class="title">UART + 双 FIFO 回环：RTL 模块与端口连接</text>
+  <text x="70" y="82" class="sub">信号名、端口名和位宽均对应 rtl/top_looptest.v 与 rtl/uart_fifo.v</text>
+
+  <!-- DUT top-level -->
+  <rect x="80" y="116" width="1440" height="744" class="outer"/>
+  <rect x="106" y="98" width="178" height="34" fill="#ffffff"/>
+  <text x="120" y="122" class="module">top_loop_test</text>
+
+  <!-- External top ports -->
+  <text x="23" y="265" class="module">rx</text>
+  <path d="M50 259 H210 H330" class="data"/>
+  <text x="156" y="246" class="small">串行输入</text>
+
+  <text x="23" y="541" class="module">tx</text>
+  <path d="M330 535 H210 H50" class="data"/>
+  <text x="156" y="522" class="small">串行输出</text>
+
+  <text x="15" y="730" class="module">clk</text>
+  <path d="M50 724 H210" class="data"/>
+  <text x="4" y="768" class="module">reset</text>
+  <path d="M50 762 H210" class="data"/>
+
+  <!-- uart_fifo wrapper -->
+  <rect x="210" y="156" width="1060" height="636" class="wrap"/>
+  <rect x="232" y="138" width="220" height="34" fill="#f8fbfd"/>
+  <text x="246" y="162" class="module">uart_fifo U_UART_FIFO</text>
+  <text x="232" y="186" class="small">clk、reset 连接至 U_UART、U_Rx_Fifo、U_Tx_Fifo</text>
+
+  <!-- Clock and reset route -->
+  <path d="M210 724 H242 V688 H1170" class="guide"/>
+  <path d="M210 762 H262 V710 H1170" class="guide"/>
+  <text x="1055" y="680" class="small">共享 clk / reset</text>
+
+  <!-- U_UART -->
+  <rect x="330" y="210" width="360" height="392" class="block"/>
+  <text x="350" y="239" class="instance">U_UART : uart</text>
+  <text x="350" y="261" class="small">baudrate_generator + transmitter + receiver</text>
+  <line x1="347" y1="276" x2="673" y2="276" class="guide"/>
+
+  <!-- UART receiver -->
+  <rect x="352" y="294" width="316" height="122" class="block"/>
+  <text x="370" y="323" class="instance">U_Receiver : receiver</text>
+  <text x="370" y="349" class="label">输入：rx</text>
+  <text x="370" y="375" class="label">输出：rx_data [7:0]、rx_done</text>
+  <text x="370" y="397" class="small">接收一帧后产生 rx_done</text>
+
+  <!-- UART transmitter -->
+  <rect x="352" y="452" width="316" height="122" class="block"/>
+  <text x="370" y="481" class="instance">U_Transmitter : transmitter</text>
+  <text x="370" y="507" class="label">输入：start、tx_data [7:0]</text>
+  <text x="370" y="533" class="label">输出：tx、tx_done</text>
+  <text x="370" y="555" class="small">发送完成后产生 tx_done</text>
+
+  <!-- RX FIFO -->
+  <rect x="790" y="240" width="338" height="164" class="block"/>
+  <text x="812" y="270" class="instance">U_Rx_Fifo : fifo</text>
+  <text x="812" y="296" class="label">ADDR_WIDTH = 3，DATA_WIDTH = 8</text>
+  <text x="812" y="321" class="label">wr_en = w_rx_done</text>
+  <text x="812" y="345" class="label">wdata = w_rx_data [7:0]</text>
+  <text x="812" y="369" class="label">rd_en = rx_en</text>
+  <text x="812" y="391" class="small">full 端口未连接；rdata = rx_data [7:0]</text>
+
+  <!-- TX FIFO -->
+  <rect x="790" y="466" width="338" height="164" class="block"/>
+  <text x="812" y="496" class="instance">U_Tx_Fifo : fifo</text>
+  <text x="812" y="522" class="label">ADDR_WIDTH = 3，DATA_WIDTH = 8</text>
+  <text x="812" y="547" class="label">wr_en = tx_en；wdata = tx_data [7:0]</text>
+  <text x="812" y="571" class="label">rd_en = w_tx_done</text>
+  <text x="812" y="595" class="label">empty = w_tx_fifo_empty</text>
+  <text x="812" y="617" class="small">rdata = w_tx_fifo_rdata [7:0]</text>
+
+  <!-- RX data and done to RX FIFO -->
+  <path d="M690 339 H790" class="bus"/>
+  <text x="740" y="326" class="port" text-anchor="middle">w_rx_data [7:0]</text>
+  <path d="M690 382 H766 V367 H790" class="control"/>
+  <text x="732" y="406" class="port" text-anchor="middle">w_rx_done</text>
+
+  <!-- TX FIFO to UART -->
+  <path d="M790 493 H712 V494 H668" class="bus"/>
+  <text x="728" y="480" class="port" text-anchor="middle">w_tx_fifo_rdata [7:0]</text>
+  <path d="M790 531 H730 V519 H668" class="control"/>
+  <text x="722" y="548" class="port" text-anchor="middle">~w_tx_fifo_empty</text>
+  <text x="692" y="566" class="small">接 U_UART.start</text>
+  <path d="M668 552 H750 V572 H790" class="control"/>
+  <text x="730" y="590" class="port" text-anchor="middle">w_tx_done</text>
+
+  <!-- Top-loop control -->
+  <rect x="1320" y="286" width="180" height="304" class="logic"/>
+  <text x="1410" y="318" class="instance" text-anchor="middle">回环搬运逻辑</text>
+  <text x="1410" y="344" class="small" text-anchor="middle">位于 top_loop_test</text>
+  <line x1="1338" y1="360" x2="1482" y2="360" class="guide"/>
+  <text x="1410" y="391" class="label" text-anchor="middle">tx_en =</text>
+  <text x="1410" y="414" class="small" text-anchor="middle">~w_rx_empty &amp; ~w_tx_full</text>
+  <text x="1410" y="452" class="label" text-anchor="middle">rx_en =</text>
+  <text x="1410" y="475" class="small" text-anchor="middle">~w_rx_empty &amp; ~w_tx_full</text>
+  <text x="1410" y="523" class="small" text-anchor="middle">同一条件下</text>
+  <text x="1410" y="545" class="small" text-anchor="middle">读 RX FIFO、写 TX FIFO</text>
+
+  <!-- UART FIFO public ports to the top-loop control -->
+  <path d="M1128 278 H1270 H1320" class="bus"/>
+  <rect x="1132" y="250" width="177" height="22" fill="#f8fbfd"/>
+  <text x="1220" y="266" class="small" text-anchor="middle">rx_data / w_rx_data [7:0]</text>
+  <path d="M1128 326 H1250 V346 H1320" class="status"/>
+  <text x="1217" y="337" class="port" text-anchor="middle">rx_empty / w_rx_empty</text>
+
+  <path d="M1320 505 H1270 V535 H1128" class="bus"/>
+  <text x="1215" y="524" class="port" text-anchor="middle">tx_data / w_rx_data [7:0]</text>
+  <path d="M1320 555 H1270 V558 H1128" class="control"/>
+  <text x="1213" y="579" class="port" text-anchor="middle">tx_en、rx_en</text>
+  <path d="M1128 605 H1250 V570 H1320" class="status"/>
+  <text x="1228" y="620" class="port" text-anchor="middle">tx_full / w_tx_full</text>
+
+  <!-- Top-level serial output / input alignment -->
+  <path d="M330 535 H270" class="data"/>
+  <text x="292" y="523" class="port" text-anchor="middle">tx</text>
+  <path d="M270 259 H330" class="data"/>
+  <text x="300" y="246" class="port" text-anchor="middle">rx</text>
+
+  <!-- Bottom legend and facts -->
+  <line x1="80" y1="890" x2="1520" y2="890" class="guide"/>
+  <text x="80" y="922" class="label">数据总线</text>
+  <line x1="158" y1="916" x2="220" y2="916" class="bus"/>
+  <text x="252" y="922" class="small">[7:0] 表示 8 位字节</text>
+  <text x="480" y="922" class="label">控制脉冲 / 使能</text>
+  <line x1="630" y1="916" x2="692" y2="916" class="control"/>
+  <text x="760" y="922" class="label">状态反馈</text>
+  <line x1="844" y1="916" x2="906" y2="916" class="status"/>
+  <text x="970" y="922" class="small">两个 FIFO 均为 8 项 x 8 位</text>
+  <text x="80" y="955" class="small">串行数据路径：rx -&gt; U_Receiver -&gt; U_Rx_Fifo -&gt; 顶层搬运逻辑 -&gt; U_Tx_Fifo -&gt; U_Transmitter -&gt; tx</text>
+</svg>

@@ -15,18 +15,19 @@ tb/scoreboard.vh
 核心逻辑：
 
 ```text
-expected data -> scoreboard_check -> actual data
+Driver 调用 scoreboard_expect(expected) 入队
+Monitor 调用 scoreboard_check_actual(actual) 出队并比较
 ```
 
-每收到一个 UART TX byte，testbench 会调用 `scoreboard_check(expected, actual)`。如果一致，打印 PASS；如果不一致，记录 error。
+每收到一个 UART TX 字节，Monitor 会调用 `scoreboard_check_actual(actual)`。Scoreboard 取出 `expected_queue` 队首数据与之比较；一致则打印 PASS，不一致则记录 error。
 
 最终打印：
 
 ```text
-UART FIFO SCOREBOARD
-CHECKED BYTE : 26
-ERROR        : 0
-RESULT       : TEST PASS
+UART FIFO SCOREBOARD 汇总
+已检查字节数 : 26
+当前错误数   : 0
+结果         : TEST PASS
 ```
 
 ## 为什么这是核心提升
@@ -38,7 +39,7 @@ RESULT       : TEST PASS
 当前不是 UVM，但思想相同：
 
 ```text
-Generator/Driver 产生输入
+Driver 产生输入
 Monitor 采集输出
 Scoreboard 自动比较
 ```
@@ -50,4 +51,3 @@ Scoreboard 自动比较
 ## 小白要记住的点
 
 波形是调试工具，不是最终验收标准。最终验收应该尽量自动化。
-

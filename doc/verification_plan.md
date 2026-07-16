@@ -1,27 +1,26 @@
-# UART FIFO Verification Plan
+# UART FIFO 验证计划
 
-## Scope
+## 验证范围
 
-The verification environment checks the UART-to-FIFO loopback path. It drives
-serial data on `rx`, monitors serial data on `tx`, and compares the observed
-bytes with a scoreboard-owned expected-data queue. RTL behavior is not changed
-by this environment.
+验证环境检查 UART 到 FIFO 的回环数据路径：Driver 在 `rx` 端驱动串行数据，Monitor
+在 `tx` 端观察并恢复串行数据，Scoreboard 将实际字节与其维护的预期数据队列逐项比较。
+该环境不修改 RTL 功能。
 
-## Test Matrix
+## 测试矩阵
 
-| Scenario | Stimulus | Primary checks |
+| 场景 | 激励 | 主要检查点 |
 | --- | --- | --- |
-| `single` | `A5` | One input byte appears unchanged at `tx`. |
-| `multi` | `11 22 33 44` | Four bytes retain ordering without loss. |
-| `stream` | `00` through `13` | Twenty sequential bytes retain ordering. |
-| `fifo` | Eight writes followed by eight reads | `full` asserts after filling; `empty` asserts after draining. |
-| `reset` | Reset followed by `A5` | Loopback resumes after reset. |
-| `all` | All scenarios | Full regression returns zero errors and no pending expected bytes. |
+| `single` | `A5` | 一个输入字节能够不变地从 `tx` 输出。 |
+| `multi` | `11 22 33 44` | 四个字节无丢失、无乱序。 |
+| `stream` | `00` 至 `13` | 20 个递增字节按顺序匹配。 |
+| `fifo` | 连续写 8 次，再连续读 8 次 | 写满后 `full` 拉高；读空后 `empty` 拉高。 |
+| `reset` | 复位后发送 `A5` | 复位释放后回环功能恢复。 |
+| `all` | 全部场景 | 完整回归零错误且预期队列无残留。 |
 
-## Pass Criteria
+## 通过标准
 
-- Every monitored byte matches the next expected byte in the scoreboard queue.
-- No unexpected bytes are observed.
-- The expected-data queue is empty at the end of the test.
-- FIFO `full` and `empty` are never asserted together.
-- The simulation exits successfully with `ERROR : 0`.
+- Monitor 观察到的每个字节都与 Scoreboard 队首预期字节一致。
+- 不出现没有对应预期值的额外输出。
+- 测试结束时预期数据队列为空。
+- 任一 FIFO 不应同时报告 `full=1` 和 `empty=1`。
+- 仿真以零错误状态结束。

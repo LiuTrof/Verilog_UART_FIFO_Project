@@ -6,20 +6,21 @@
 
 ## 当前调整
 
-新增了三个核心目录：
+当前建议优先关注以下核心目录：
 
 ```text
-rtl/                  # 作品集视角下的 RTL 源码入口
-tb/                   # 验证环境入口
-doc/steps/            # 每一步学习笔记和方法论
+rtl/                  # 当前实际编译的 RTL 源码入口，已补中文注释
+tb/                   # 当前实际编译的验证环境入口，已补中文注释
+doc/                  # 验证计划、波形因果说明、初学者指南和学习笔记
 ```
 
 同时保留原始目录：
 
 ```text
-sources_1/new/        # 原 Vivado 风格源码目录
+sources_1/new/        # 原 Vivado 风格源码备份；run.sh 不编译该目录
 sim/uart_fifo_sim/    # 仿真输出目录
 png/                  # 波形截图目录
+doc/images_cn/        # 中文架构图与流程图（PNG、SVG）
 ```
 
 ## 为什么这样做
@@ -36,22 +37,12 @@ png/                  # 波形截图目录
 
 工程目录本身就是表达能力的一部分。一个清晰目录能让别人感觉你不是“只会跑代码”，而是在按工程方法管理项目。
 
-八、现在推荐你怎么看这个项目
-你可以按这个顺序理解：
-先看 [README.md](/Users/athena/Desktop/myself/testDataIC/Verilog_UART_FIFO_0524/README.md)
-明白这个项目现在整体长什么样。
+## 推荐阅读顺序
 
-再看 [doc/steps/01_project_structure.md](/Users/athena/Desktop/myself/testDataIC/Verilog_UART_FIFO_0524/doc/steps/01_project_structure.md)
-明白为什么要整理目录。
-
-再看 [tb/tb_top_loop_test.v](/Users/athena/Desktop/myself/testDataIC/Verilog_UART_FIFO_0524/tb/tb_top_loop_test.v)
-这是验证入口。
-
-再看 [tb/test_case.vh](/Users/athena/Desktop/myself/testDataIC/Verilog_UART_FIFO_0524/tb/test_case.vh)
-这里能看到具体测了什么。
-
-再看 [tb/scoreboard.vh](/Users/athena/Desktop/myself/testDataIC/Verilog_UART_FIFO_0524/tb/scoreboard.vh)
-这里是自动判断 PASS/FAIL 的核心。
-
-最后看 [rtl/top_looptest.v](/Users/athena/Desktop/myself/testDataIC/Verilog_UART_FIFO_0524/rtl/top_looptest.v)
-理解 DUT 顶层怎么把 RX FIFO 搬到 TX FIFO。
+1. [README.md](../../README.md)：先了解项目目标、回归命令和当前验证边界。
+2. [RTL 与 TB 初学者指南](../rtl_tb_beginner_guide.md)：按三小时路线建立完整心智模型。
+3. [`rtl/top_looptest.v`](../../rtl/top_looptest.v)：理解何时发生 RX FIFO 到 TX FIFO 的搬运。
+4. [`rtl/uart_fifo.v`](../../rtl/uart_fifo.v)：理解 UART、RX FIFO、TX FIFO 三者如何连接。
+5. [`rtl/uart.v`](../../rtl/uart.v) 与 [`rtl/fifo.v`](../../rtl/fifo.v)：理解 UART 时序和 FIFO 指针。
+6. [`tb/tb_top_loop_test.v`](../../tb/tb_top_loop_test.v)：理解验证环境入口和主流程。
+7. [`tb/driver/uart_driver.vh`](../../tb/driver/uart_driver.vh)、[`tb/monitor/uart_monitor.vh`](../../tb/monitor/uart_monitor.vh)、[`tb/scoreboard.vh`](../../tb/scoreboard.vh)：理解自检闭环。
