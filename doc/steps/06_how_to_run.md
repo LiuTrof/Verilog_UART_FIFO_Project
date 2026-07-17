@@ -2,7 +2,8 @@
 
 ## 运行命令
 
-在 `Verilog_UART_FIFO_0524` 目录下使用统一入口：
+在 `Verilog_UART_FIFO_0524` 目录下使用统一 UVM 入口。需要 VCS、Questa/ModelSim
+（含 UVM）或 Xcelium；Icarus Verilog 不能执行标准 UVM class-based testbench。
 
 ```bash
 ./run.sh single

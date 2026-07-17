@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 # ============================================================================
-# 文件作用：项目统一仿真入口。
-# 功能：编译当前 rtl/ 和 tb/，运行 +TEST 指定的验证场景，将终端输出保存为日志；
-# 可选生成 VCD 并打开对应 GTKWave 视图。
+# 文件作用：项目统一 UVM 仿真入口。
+# 功能：使用 VCS、Questa 或 Xcelium 编译 RTL/UVM testbench，运行 +TEST 指定的
+# 场景并保存日志；可选生成 VCD 和打开对应 GTKWave 视图。
 # 用法：./run.sh {single|multi|stream|fifo|reset|all} [--wave]
 # 说明：all 是完整回归；--wave 只支持单独场景，避免大 VCD 拖慢回归。
 # ============================================================================
@@ -35,25 +35,59 @@ esac
 
 mkdir -p "$SIM_DIR" "$LOG_DIR"  # 首次运行时自动创建输出目录。
 
-OUTPUT="$SIM_DIR/uart_fifo_${CASE_NAME}.out"  # Icarus 编译生成的仿真可执行文件。
+OUTPUT="$SIM_DIR/uart_fifo_${CASE_NAME}.out"  # VCS 编译生成的仿真可执行文件。
 VCD_FILE="$SIM_DIR/${CASE_NAME}.vcd"           # 可选波形文件路径。
 LOG_FILE="$LOG_DIR/${CASE_NAME}.log"           # 场景运行日志路径。
-VVP_ARGS=("+TEST=$CASE_NAME")                   # 传给 Testbench 的 plusarg。
+SIM_ARGS=("+TEST=$CASE_NAME")                   # 传给 Testbench 的 plusarg。
 
 if [[ "$OPEN_WAVE" == "1" ]]; then
-    VVP_ARGS+=("+VCD=$VCD_FILE")
+    SIM_ARGS+=("+VCD=$VCD_FILE")
 fi
 
-cd "$PROJECT_DIR"  # 保证包含路径和生成物路径都相对项目根目录。
-iverilog -g2012 -I tb -o "$OUTPUT" \
-    tb/tb_top_loop_test.v \
-    rtl/top_looptest.v \
-    rtl/uart_fifo.v \
-    rtl/uart.v \
+RTL_FILES=(
+    rtl/top_looptest.v
+    rtl/uart_fifo.v
+    rtl/uart.v
     rtl/fifo.v
+)
+UVM_FILES=(
+    tb/uvm/uart_fifo_if.sv
+    tb/uvm/uart_fifo_pkg.sv
+    tb/uvm/tb_top_loop_test_uvm.sv
+)
+
+cd "$PROJECT_DIR"  # 保证包含路径和生成物路径都相对项目根目录。
+if command -v vcs >/dev/null 2>&1; then
+    vcs -sverilog -ntb_opts uvm-1.2 -timescale=1ns/1ps -top tb_top_loop_test_uvm \
+        -Mdir="$SIM_DIR/vcs_csrc" -o "$OUTPUT" \
+        "${UVM_FILES[@]}" "${RTL_FILES[@]}"
+    RUN_SIM=("$OUTPUT")
+elif command -v xrun >/dev/null 2>&1; then
+    RUN_SIM=(xrun -64bit -uvm -access +rwc -timescale 1ns/1ps -top tb_top_loop_test_uvm \
+        -xmlibdirname "$SIM_DIR/xcelium.d" \
+        "${UVM_FILES[@]}" "${RTL_FILES[@]}")
+elif command -v vsim >/dev/null 2>&1 && command -v vlib >/dev/null 2>&1; then
+    if [[ -z "${UVM_HOME:-}" || ! -f "$UVM_HOME/src/uvm_pkg.sv" ]]; then
+        echo "Questa/ModelSim 需要设置 UVM_HOME，且其中应包含 src/uvm_pkg.sv。"
+        echo "示例：export UVM_HOME=/path/to/uvm-1.2"
+        exit 127
+    fi
+    WORK_LIB="$SIM_DIR/work"
+    rm -rf "$WORK_LIB"
+    vlib "$WORK_LIB"
+    vlog -work "$WORK_LIB" -sv +define+UVM_NO_DPI \
+        "+incdir+$UVM_HOME/src" "$UVM_HOME/src/uvm_pkg.sv" \
+        "${UVM_FILES[@]}" "${RTL_FILES[@]}"
+    RUN_SIM=(vsim -c -lib "$WORK_LIB" tb_top_loop_test_uvm -do "run -all; quit -f")
+else
+    echo "未检测到支持 UVM 1.2 的仿真器。"
+    echo "请安装或配置 VCS、Questa/ModelSim（含 UVM）或 Xcelium，然后重新运行。"
+    echo "当前检测到的 Icarus Verilog 不能运行标准 UVM class-based testbench。"
+    exit 127
+fi
 
 echo "[RUN] 场景=$CASE_NAME" | tee "$LOG_FILE"  # 新建日志并记录场景名。
-vvp "$OUTPUT" "${VVP_ARGS[@]}" 2>&1 | tee -a "$LOG_FILE"  # 运行并同时输出到终端和日志。
+"${RUN_SIM[@]}" "${SIM_ARGS[@]}" 2>&1 | tee -a "$LOG_FILE"  # 运行并同时输出到终端和日志。
 echo "[RUN] 日志=$LOG_FILE"
 if [[ "$OPEN_WAVE" == "1" ]]; then
     echo "[RUN] 波形=$VCD_FILE"
