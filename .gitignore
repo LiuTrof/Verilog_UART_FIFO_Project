@@ -8,6 +8,14 @@ sim/uart_fifo_sim/xcelium.d/
 sim/uart_fifo_sim/work/
 simv
 
+# DV platform generated data and frontend packages
+sim/dv_platform/
+.venv/
+__pycache__/
+*.py[cod]
+dv_platform/frontend/node_modules/
+dv_platform/frontend/dist/
+
 # macOS Finder metadata
 .DS_Store
 png/.DS_Store

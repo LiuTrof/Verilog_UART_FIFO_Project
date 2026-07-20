@@ -76,6 +76,19 @@ GTKWave 场景视图说明见 [gtkwave_views/README.md](gtkwave_views/README.md)
 - `doc/waveform_causality.md`：将 RTL 行为与波形现象对应起来。
 - `doc/steps/`：记录目录整理、testbench 拆分、用例、Scoreboard、检查和运行方式。
 
+## 验证平台工作台
+
+在原有 UVM 验证入口之上，新增了 [Chip DV Platform](dv_platform/README.md)：它将现有
+测试场景封装为结构化自动化回归，保存 JSON 报告和原始日志，并提供 FastAPI + SQLite 后端、
+React/TypeScript 工作台以及 VCD 信号索引。该平台不会修改 RTL，也不会将 Icarus 误称为
+UVM 仿真器；本机无商用 UVM 工具时，它使用保留的 legacy 自检入口作为明确标记的兼容回归。
+
+```bash
+python3 -m dv_platform.automation --cases fifo
+```
+
+平台启动、API 与质量门禁见 [dv_platform/README.md](dv_platform/README.md)。
+
 ## 项目概述
 
 > 基于 Verilog UART/FIFO RTL，完成 UART 收发器、FIFO 缓冲模块及顶层 loopback 数据通路分析，梳理 UART RX -> RX FIFO -> 顶层搬运逻辑 -> TX FIFO -> UART TX 的完整传输链路。在原有 task testbench 基础上，搭建 UVM 模块级自检验证环境：UART agent 的 Driver 和 Monitor 分别完成 `rx` 端激励生成与 `tx` 端采样恢复，Scoreboard 通过 analysis port 对预期与实际事务自动比对。保留单字节回环、多字节顺序、递增序列、FIFO `full/empty` 边界与 reset recovery 场景，并以支持 UVM 1.2 的仿真器执行场景化回归和波形分析。
