@@ -7,6 +7,8 @@ import shutil
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from threading import Lock
+from typing import ClassVar
 
 from dv_platform.automation.models import resolve_project_root
 
@@ -29,6 +31,11 @@ class WaveformNotFoundError(FileNotFoundError):
 class WaveformService:
     """Manage project-local VCD files without allowing arbitrary path traversal."""
 
+    # VCD declarations end at $enddefinitions. Cache only that compact header so
+    # listing a directory with multi-GB simulation traces stays interactive.
+    _signal_cache: ClassVar[dict[Path, tuple[int, int, tuple[dict[str, object], ...]]]] = {}
+    _cache_lock: ClassVar[Lock] = Lock()
+
     def __init__(self, waveform_dir: Path | None = None) -> None:
         self.waveform_dir = waveform_dir or resolve_project_root() / "sim" / "uart_fifo_sim"
         self.waveform_dir.mkdir(parents=True, exist_ok=True)
@@ -41,6 +48,13 @@ class WaveformService:
 
     @staticmethod
     def _signals(path: Path) -> list[dict[str, object]]:
+        stat = path.stat()
+        cache_key = (stat.st_mtime_ns, stat.st_size)
+        with WaveformService._cache_lock:
+            cached = WaveformService._signal_cache.get(path)
+        if cached and cached[:2] == cache_key:
+            return list(cached[2])
+
         signals: list[dict[str, object]] = []
         scope: list[str] = []
         with path.open("r", encoding="utf-8", errors="replace") as source:
@@ -48,6 +62,8 @@ class WaveformService:
                 tokens = line.split()
                 if not tokens:
                     continue
+                if tokens[0] == "$enddefinitions":
+                    break
                 if tokens[0] == "$scope" and len(tokens) >= 3:
                     scope.append(tokens[2])
                 elif tokens[0] == "$upscope" and scope:
@@ -63,7 +79,9 @@ class WaveformService:
                                 "width": int(width),
                             }
                         )
-        return signals
+        with WaveformService._cache_lock:
+            WaveformService._signal_cache[path] = (*cache_key, tuple(signals))
+        return list(signals)
 
     def list_waveforms(self) -> list[WaveformSummary]:
         """Return all imported/generated VCDs with header-derived signal counts."""
@@ -88,7 +106,8 @@ class WaveformService:
         query = search.casefold().strip()
         signals = self._signals(path)
         matching = [signal for signal in signals if not query or query in str(signal["name"]).casefold()]
-        preview = path.read_text(encoding="utf-8", errors="replace")[:1200]
+        with path.open("r", encoding="utf-8", errors="replace") as source:
+            preview = source.read(1200)
         return {
             "name": path.name,
             "signal_count": len(signals),
@@ -102,6 +121,8 @@ class WaveformService:
 
         target = self.waveform_dir / f"{Path(filename).stem}.vcd"
         shutil.copyfile(source_path, target)
+        with self._cache_lock:
+            self._signal_cache.pop(target, None)
         stat = target.stat()
         return WaveformSummary(
             name=target.name,

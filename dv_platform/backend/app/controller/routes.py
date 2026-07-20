@@ -219,7 +219,8 @@ async def upload_waveform(
     if not file.filename or not file.filename.lower().endswith(".vcd"):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Only .vcd waveform files are accepted.")
     with tempfile.NamedTemporaryFile(delete=False, suffix=".vcd") as temporary:
-        temporary.write(await file.read())
+        while chunk := await file.read(1024 * 1024):
+            temporary.write(chunk)
         temporary_path = Path(temporary.name)
     try:
         return waveforms.import_vcd(temporary_path, file.filename).__dict__

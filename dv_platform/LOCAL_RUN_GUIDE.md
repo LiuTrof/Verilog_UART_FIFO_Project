@@ -246,3 +246,32 @@ node --version
 
 再次启动时，重复第 3、4、5 节的命令即可；Python 虚拟环境和 `node_modules` 已存在时，
 无需每次重复安装依赖。
+
+## 9. 固定公网演示链接
+
+项目提供 `dv_platform/start_demo_tunnel.sh`，用于通过 Serveo 将本机前端临时公开为固定
+HTTPS 地址。首次使用需要在 Serveo 绑定本机 SSH 公钥；绑定后，即使关闭并重新打开隧道
+终端，只要前端和后端已启动，重新运行脚本就会恢复相同的地址。
+
+首次绑定完成后，在新的终端执行：
+
+```bash
+cd /Users/athena/Desktop/File/testDataIC/Verilog_UART_FIFO_0524
+./dv_platform/start_demo_tunnel.sh
+```
+
+默认固定地址是：
+
+```text
+https://chip-dv-uart-demo.serveousercontent.com
+```
+
+可传入自己的子域名作为第一个参数：
+
+```bash
+./dv_platform/start_demo_tunnel.sh my-chip-dv-demo
+```
+
+该隧道只在脚本所在终端运行期间对公网开放。脚本会在 SSH 隧道意外断开时自动重连；按
+`Control + C` 停止。之后重新执行同一条命令即可恢复同一个固定地址。演示链接拥有平台
+当前的完整功能，不应公开给不受信任的人员。

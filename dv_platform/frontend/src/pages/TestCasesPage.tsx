@@ -41,7 +41,11 @@ export function TestCasesPage({ cases, selected, search, resultFilter, running, 
         </select>
         <span className="selection-count">已选择 {selected.size} / {cases.length}</span>
       </section>
-      <article className="panel">
+      <article className="panel testcase-panel">
+        <div className="panel-title">
+          <div><p className="eyebrow">TEST PLAN</p><h2>验证用例清单</h2></div>
+          <div className="panel-title-actions"><span className="panel-count">{visibleCases.length} / {cases.length} 个</span></div>
+        </div>
         <div className="table-wrap">
           <table className="testcase-table">
             <thead><tr><th><input type="checkbox" aria-label="选择当前筛选的全部测试用例" checked={allVisibleSelected} onChange={(event) => onSetVisibleSelection(visibleCases.map((testcase) => testcase.name), event.target.checked)} /></th><th>Testcase</th><th>测试目的</th><th>负责人</th><th>预期检查</th><th>最近结果</th></tr></thead>

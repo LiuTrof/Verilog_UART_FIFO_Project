@@ -1,4 +1,4 @@
-import { Activity, CircleCheckBig, CircleX, Layers3, Play } from "lucide-react";
+import { Activity, CircleCheckBig, CircleX, Clock3, Layers3, Play } from "lucide-react";
 import { Metric } from "../components/Metric";
 import { StatusBadge } from "../components/StatusBadge";
 import type { Dashboard, Regression } from "../types";
@@ -15,6 +15,16 @@ const formatDate = (timestamp: string | null) =>
 
 export function DashboardPage({ dashboard, regressions, running, onRunAll }: DashboardPageProps) {
   const latest = dashboard.latest_regression;
+  const passedRuns = regressions.filter((regression) => regression.status === "passed").length;
+  const failedRuns = regressions.filter((regression) => regression.status === "failed").length;
+  const activeRuns = regressions.filter((regression) => regression.status === "queued").length;
+  const historyInsight = !regressions.length
+    ? "尚无历史任务。启动一次完整回归后，结果会保留在这里。"
+    : activeRuns
+      ? `当前有 ${activeRuns} 条任务正在执行，已完成的场景结果可在回归中心实时查看。`
+      : failedRuns
+        ? `历史中有 ${failedRuns} 条失败任务，建议优先在回归中心查看对应场景日志。`
+        : `共 ${passedRuns} 条历史任务已通过，最近一次回归结果稳定。`;
   return (
     <div className="page-stack">
       <section className="page-title-row">
@@ -83,22 +93,37 @@ export function DashboardPage({ dashboard, regressions, running, onRunAll }: Das
         </article>
       </section>
 
-      <article className="panel">
+      <article className="panel history-panel">
         <div className="panel-title">
           <div><p className="eyebrow">RECENT ACTIVITY</p><h2>回归历史</h2></div>
-          <Activity size={20} />
+          <div className="panel-title-actions"><span className="panel-count">{regressions.length} 条记录</span><Activity size={20} /></div>
         </div>
-        <div className="table-wrap">
+        <div className="history-summary" aria-label="回归历史摘要">
+          <div className="history-summary-item history-summary-passed">
+            <span className="history-summary-icon"><CircleCheckBig size={19} /></span>
+            <div className="history-summary-copy"><span>已通过</span><strong>{passedRuns}<small>条任务</small></strong></div>
+          </div>
+          <div className="history-summary-item history-summary-failed">
+            <span className="history-summary-icon"><CircleX size={19} /></span>
+            <div className="history-summary-copy"><span>需关注</span><strong>{failedRuns}<small>条任务</small></strong></div>
+          </div>
+          <div className="history-summary-item history-summary-running">
+            <span className="history-summary-icon"><Clock3 size={19} /></span>
+            <div className="history-summary-copy"><span>执行中</span><strong>{activeRuns}<small>条任务</small></strong></div>
+          </div>
+        </div>
+        <p className="history-insight"><Activity size={15} />{historyInsight}</p>
+        <div className="table-wrap history-table-scroll" tabIndex={0} aria-label="全部回归历史记录">
           <table>
-            <thead><tr><th>任务</th><th>状态</th><th>结果</th><th>仿真器</th><th>开始时间</th></tr></thead>
+            <thead><tr><th>任务</th><th>状态</th><th>场景通过</th><th>仿真器</th><th>执行时间</th></tr></thead>
             <tbody>
-              {regressions.slice(0, 6).map((regression) => (
-                <tr key={regression.id}>
-                  <td className="mono">{regression.id}</td>
+              {regressions.map((regression) => (
+                <tr key={regression.id} data-status={regression.status}>
+                  <td><div className="history-task"><strong className="mono">{regression.id}</strong><small>{regression.finished_at ? "已完成归档" : "正在记录结果"}</small></div></td>
                   <td><StatusBadge status={regression.status} /></td>
-                  <td>{regression.total_cases ? `${regression.passed_cases}/${regression.total_cases} 通过` : "准备中"}</td>
+                  <td><span className="history-result">{regression.total_cases ? `${regression.passed_cases}/${regression.total_cases}` : "准备中"}<small>{regression.total_cases ? "通过场景" : "等待资源"}</small></span></td>
                   <td>{regression.simulator}</td>
-                  <td>{formatDate(regression.started_at)}</td>
+                  <td><div className="history-time"><time>{formatDate(regression.started_at)}</time><small>{regression.finished_at ? `完成 ${formatDate(regression.finished_at)}` : "仍在执行"}</small></div></td>
                 </tr>
               ))}
               {!regressions.length && <tr><td colSpan={5} className="table-empty">没有可展示的回归记录。</td></tr>}

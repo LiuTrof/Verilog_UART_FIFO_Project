@@ -17,6 +17,7 @@ interface NavigationItem {
 }
 
 const MOBILE_SIDEBAR_BREAKPOINT = 620;
+const TUNNEL_PROGRESS_POLL_MS = 3_000;
 const navigation: NavigationItem[] = [
   { view: "dashboard", label: "仪表盘", icon: LayoutDashboard },
   { view: "testcases", label: "测试管理", icon: TestTube2 },
@@ -26,6 +27,11 @@ const navigation: NavigationItem[] = [
 
 const apiErrorMessage = (reason: unknown, fallback: string) =>
   reason instanceof Error ? reason.message : fallback;
+
+const usesTunnelTransport = () =>
+  window.location.hostname.endsWith(".serveousercontent.com") ||
+  window.location.hostname.endsWith(".free.pinggy.net") ||
+  window.location.hostname.endsWith(".run.pinggy-free.link");
 
 export function App() {
   const [view, setView] = useState<View>("dashboard");
@@ -172,35 +178,61 @@ export function App() {
     ) return;
     const regressionId = selectedRegression.id;
     let active = true;
-    const eventSource = new EventSource(`/api/v1/regressions/${regressionId}/events`);
-    eventSource.onmessage = (event) => {
+    let eventSource: EventSource | null = null;
+    let timer: number | undefined;
+    let request: AbortController | null = null;
+
+    const applyProgress = (progress: { regression: Regression; simulations: Simulation[] }) => {
+      const { regression: updated, simulations: nextSimulations } = progress;
+      if (!active || selectedRegressionId.current !== updated.id) return false;
+      setSelectedRegression(updated);
+      setRegressions((current) => current.map((regression) => regression.id === updated.id ? updated : regression));
+      setSimulations(nextSimulations);
+      if (updated.status !== "queued") {
+        eventSource?.close();
+        void refreshOverview(project);
+        if (testcasesLoaded) void refreshTestcases(project);
+      }
+      setError(null);
+      return updated.status === "queued";
+    };
+
+    const pollProgress = async () => {
+      request = new AbortController();
       try {
-        const progress = JSON.parse(event.data) as { regression: Regression; simulations: Simulation[] };
-        const { regression: updated, simulations: nextSimulations } = progress;
-        if (!active || selectedRegressionId.current !== updated.id) return;
-        setSelectedRegression(updated);
-        setRegressions((current) => current.map((regression) => regression.id === updated.id ? updated : regression));
-        setSimulations(nextSimulations);
-        if (updated.status !== "queued") {
-          active = false;
-          eventSource.close();
-          void refreshOverview(project);
-          if (testcasesLoaded) void refreshTestcases(project);
-        }
-        setError(null);
+        const progress = await platformApi.regressionProgress(regressionId, { signal: request.signal });
+        if (applyProgress(progress)) timer = window.setTimeout(() => void pollProgress(), TUNNEL_PROGRESS_POLL_MS);
       } catch (reason) {
-        setError(apiErrorMessage(reason, "无法解析实时回归进度。"));
+        if (!request.signal.aborted && active) {
+          setError(apiErrorMessage(reason, "无法刷新回归状态。"));
+          timer = window.setTimeout(() => void pollProgress(), TUNNEL_PROGRESS_POLL_MS);
+        }
       }
     };
-    eventSource.onerror = () => {
-      if (!active) return;
-      active = false;
-      eventSource.close();
-      setError("实时回归连接中断，请使用刷新按钮读取最新结果。");
-    };
+
+    if (usesTunnelTransport()) {
+      void pollProgress();
+    } else {
+      eventSource = new EventSource(`/api/v1/regressions/${regressionId}/events`);
+      eventSource.onmessage = (event) => {
+        try {
+          applyProgress(JSON.parse(event.data) as { regression: Regression; simulations: Simulation[] });
+        } catch (reason) {
+          setError(apiErrorMessage(reason, "无法解析实时回归进度。"));
+        }
+      };
+      eventSource.onerror = () => {
+        if (!active) return;
+        eventSource?.close();
+        // Long-lived SSE can be dropped by an intermediary. Continue without user intervention.
+        void pollProgress();
+      };
+    }
     return () => {
       active = false;
-      eventSource.close();
+      eventSource?.close();
+      request?.abort();
+      if (timer !== undefined) window.clearTimeout(timer);
     };
   }, [documentVisible, project, refreshOverview, refreshTestcases, selectedRegression?.id, selectedRegression?.status, testcasesLoaded, view]);
 
@@ -265,6 +297,10 @@ export function App() {
 
   const uploadWaveform = async (file: File) => {
     if (!project) return;
+    if (!file.name.toLocaleLowerCase().endsWith(".vcd")) {
+      setError("请选择扩展名为 .vcd 的波形文件。");
+      return;
+    }
     setImportingWaveform(true);
     try {
       const waveform = await platformApi.uploadWaveform(project.id, file);
@@ -321,7 +357,7 @@ export function App() {
     <button className="sidebar-backdrop" aria-label="关闭导航" onClick={() => setSidebarOpen(false)} />
     <aside className="sidebar" aria-label="主导航">
       <div className="brand">
-        <div className="brand-mark"><ChartNoAxesCombined size={20} /></div>
+        <div className="brand-mark" title="Chip DV Platform" aria-label="Chip DV Platform"><ChartNoAxesCombined size={20} /></div>
         {sidebarOpen && <div><strong>Chip DV</strong><span>Verification Platform</span></div>}
       </div>
       <nav>

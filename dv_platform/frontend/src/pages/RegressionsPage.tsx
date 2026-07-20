@@ -17,6 +17,12 @@ const dateTime = (value: string) => new Intl.DateTimeFormat("zh-CN", { dateStyle
 const testcaseName = (simulation: Simulation) => simulation.testcase_name ?? simulation.log_path.split("_").pop()?.replace(".log", "") ?? "case";
 
 export function RegressionsPage({ regressions, selectedRegression, simulations, running, onRunAll, onSelect, onRefresh }: RegressionsPageProps) {
+  const totalCases = selectedRegression?.total_cases ?? 0;
+  const completedCases = simulations.length;
+  const passedCases = simulations.filter((simulation) => simulation.status === "passed").length;
+  const failedCases = simulations.filter((simulation) => simulation.status === "failed").length;
+  const completionPercent = totalCases ? Math.min(100, Math.round((completedCases / totalCases) * 100)) : 0;
+
   return (
     <div className="page-stack">
       <section className="page-title-row">
@@ -25,7 +31,7 @@ export function RegressionsPage({ regressions, selectedRegression, simulations, 
       </section>
       <section className="regression-layout">
         <article className="panel run-list">
-          <div className="panel-title"><div><p className="eyebrow">RUNS</p><h2>任务队列</h2></div><Clock3 size={20} /></div>
+          <div className="panel-title"><div><p className="eyebrow">RUNS</p><h2>任务队列</h2></div><div className="panel-title-actions"><span className="panel-count">{regressions.length} 条</span><Clock3 size={20} /></div></div>
           <div className="run-list-body">
             {regressions.map((regression) => (
               <button key={regression.id} className={`run-list-item ${selectedRegression?.id === regression.id ? "selected" : ""}`} onClick={() => onSelect(regression)}>
@@ -40,9 +46,10 @@ export function RegressionsPage({ regressions, selectedRegression, simulations, 
         <article className="panel details-panel">
           <div className="panel-title"><div><p className="eyebrow">RUN DETAILS</p><h2>{selectedRegression?.id ?? "选择一个任务"}</h2></div>{selectedRegression && <StatusBadge status={selectedRegression.status} />}</div>
           {selectedRegression ? <>
-            <dl className="run-details compact"><div><dt>仿真器</dt><dd>{selectedRegression.simulator}</dd></div><div><dt>完成情况</dt><dd>{selectedRegression.total_cases ? `${selectedRegression.passed_cases}/${selectedRegression.total_cases} 已通过，${simulations.length}/${selectedRegression.total_cases} 已完成` : "准备中"}</dd></div><div><dt>报告路径</dt><dd className="path-text">{selectedRegression.report_path ?? "全部场景完成后生成"}</dd></div></dl>
+            <dl className="run-details compact"><div><dt>仿真器</dt><dd>{selectedRegression.simulator}</dd></div><div><dt>完成情况</dt><dd>{selectedRegression.total_cases ? `${selectedRegression.passed_cases}/${selectedRegression.total_cases} 已通过，${completedCases}/${selectedRegression.total_cases} 已完成` : "准备中"}</dd></div><div><dt>报告路径</dt><dd className="path-text">{selectedRegression.report_path ?? "全部场景完成后生成"}</dd></div></dl>
             <section className="live-results" aria-live="polite">
-              <div className="live-results-title"><div><p className="eyebrow">CASE RESULTS</p><h3>场景执行结果</h3></div><span>{simulations.length}/{selectedRegression.total_cases || "-"} 已完成</span></div>
+              <div className="live-results-title"><div><p className="eyebrow">CASE RESULTS</p><h3>场景执行结果</h3></div><div className="live-progress"><span>{completedCases}/{totalCases || "-"} 已完成</span><div className="live-progress-track" role="progressbar" aria-label="场景完成进度" aria-valuemin={0} aria-valuemax={totalCases || 0} aria-valuenow={completedCases}><i style={{ width: `${completionPercent}%` }} /></div></div></div>
+              <div className="case-summary" aria-label="场景执行摘要"><span><strong>{completedCases}</strong>已完成</span><span><strong>{passedCases}</strong>已通过</span><span className={failedCases ? "has-failures" : ""}><strong>{failedCases}</strong>失败</span></div>
               <div className="simulation-list">
                 {simulations.map((simulation) => <section className={`simulation-row simulation-${simulation.status}`} key={simulation.id}><div><strong className="mono">{testcaseName(simulation)}</strong><span>{simulation.status === "passed" ? "场景执行成功" : "场景执行失败"}，{simulation.checked_bytes ?? 0} 字节检查，{simulation.runtime_seconds.toFixed(3)} 秒</span></div><div><StatusBadge status={simulation.status} /><small>{simulation.failure_reason ?? simulation.log_path}</small></div></section>)}
                 {!simulations.length && <EmptyState title={selectedRegression.status === "queued" ? "正在等待第一个场景结果" : "没有场景结果"} detail={selectedRegression.status === "queued" ? "每个测试场景完成后会立即显示在这里。" : "请查看报告路径或任务日志。"} />}
