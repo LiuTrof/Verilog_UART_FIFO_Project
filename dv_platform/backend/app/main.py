@@ -32,6 +32,7 @@ def create_app() -> FastAPI:
     @app.on_event("startup")
     def initialize_platform() -> None:
         service.bootstrap()
+        service.resume_queued_regressions()
 
     return app
 

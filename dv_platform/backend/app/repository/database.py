@@ -40,7 +40,8 @@ CREATE TABLE IF NOT EXISTS regressions (
     finished_at TEXT,
     total_cases INTEGER NOT NULL DEFAULT 0,
     passed_cases INTEGER NOT NULL DEFAULT 0,
-    report_path TEXT
+    report_path TEXT,
+    requested_cases TEXT
 );
 
 CREATE TABLE IF NOT EXISTS simulations (
@@ -86,7 +87,10 @@ def connect(database_path: Path | None = None) -> sqlite3.Connection:
 
 
 def initialize(database_path: Path | None = None) -> None:
-    """Create missing tables. This operation is intentionally idempotent."""
+    """Create missing tables and apply additive schema upgrades."""
 
     with connect(database_path) as connection:
         connection.executescript(SCHEMA)
+        regression_columns = {row["name"] for row in connection.execute("PRAGMA table_info(regressions)")}
+        if "requested_cases" not in regression_columns:
+            connection.execute("ALTER TABLE regressions ADD COLUMN requested_cases TEXT")

@@ -275,3 +275,29 @@ https://chip-dv-uart-demo.serveousercontent.com
 该隧道只在脚本所在终端运行期间对公网开放。脚本会在 SSH 隧道意外断开时自动重连；按
 `Control + C` 停止。之后重新执行同一条命令即可恢复同一个固定地址。演示链接拥有平台
 当前的完整功能，不应公开给不受信任的人员。
+
+Serveo 固定地址要求 Serveo 账户仍有可用隧道额度，且当前机器的 SSH 公钥已在该账户中
+成功授权。若终端显示 `remote port forwarding failed for listen port 80`，请在 Serveo Console
+关闭旧的活跃隧道后再重试；浏览器返回 `502` 表示公网转发没有成功建立，并非访问者是否
+与本机处于同一个 Wi-Fi 所致。
+
+## 10. Cloudflare 临时公网演示链接
+
+当 Serveo 的额度或固定地址不可用时，可使用项目提供的 Cloudflare 备用隧道。该方式不需要
+访问者与本机连接同一网络，但每次重启会生成一个新的 `trycloudflare.com` 地址。
+
+首次安装工具：
+
+```bash
+brew install cloudflared
+```
+
+在前端和后端都已启动后，另开一个终端执行：
+
+```bash
+cd /Users/athena/Desktop/File/testDataIC/Verilog_UART_FIFO_0524
+./dv_platform/start_cloudflare_demo_tunnel.sh
+```
+
+终端打印的 `https://*.trycloudflare.com` 即为可分享地址。该终端、前端终端和后端终端都必须
+持续运行；按 `Control + C` 停止隧道后，公网地址立即失效。

@@ -37,6 +37,7 @@ class Regression:
     total_cases: int
     passed_cases: int
     report_path: str | None
+    requested_cases: str | None = None
 
 
 @dataclass(frozen=True)

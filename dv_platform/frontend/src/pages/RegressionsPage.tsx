@@ -24,7 +24,7 @@ export function RegressionsPage({ regressions, selectedRegression, simulations, 
   const completionPercent = totalCases ? Math.min(100, Math.round((completedCases / totalCases) * 100)) : 0;
 
   return (
-    <div className="page-stack">
+    <div className="page-stack workbench-page regressions-page">
       <section className="page-title-row">
         <div><p className="eyebrow">REGRESSION CENTER</p><h1>回归任务</h1><p className="muted">每个任务保留编译结果、场景状态、运行时间和完整日志路径。</p></div>
         <div className="button-row"><button className="icon-button" onClick={onRefresh} title="刷新回归状态"><RefreshCw size={17} /></button><button className="primary-action" onClick={onRunAll} disabled={running}><Play size={16} fill="currentColor" />{running ? "执行中" : "发起完整回归"}</button></div>

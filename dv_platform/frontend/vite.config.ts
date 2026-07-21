@@ -5,7 +5,13 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
-    allowedHosts: [".free.pinggy.net", ".run.pinggy-free.link", ".serveousercontent.com"],
+    allowedHosts: [
+      ".free.pinggy.net",
+      ".run.pinggy-free.link",
+      ".serveousercontent.com",
+      ".loca.lt",
+      ".trycloudflare.com"
+    ],
     proxy: {
       "/api": "http://127.0.0.1:8000"
     }

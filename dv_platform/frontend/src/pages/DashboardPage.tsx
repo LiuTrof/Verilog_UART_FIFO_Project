@@ -1,11 +1,12 @@
 import { Activity, CircleCheckBig, CircleX, Clock3, Layers3, Play } from "lucide-react";
 import { Metric } from "../components/Metric";
 import { StatusBadge } from "../components/StatusBadge";
-import type { Dashboard, Regression } from "../types";
+import type { Dashboard, Regression, TestCase } from "../types";
 
 interface DashboardPageProps {
   dashboard: Dashboard;
   regressions: Regression[];
+  testcases: TestCase[];
   running: boolean;
   onRunAll: () => void;
 }
@@ -13,8 +14,18 @@ interface DashboardPageProps {
 const formatDate = (timestamp: string | null) =>
   timestamp ? new Intl.DateTimeFormat("zh-CN", { dateStyle: "short", timeStyle: "medium" }).format(new Date(timestamp)) : "等待执行";
 
-export function DashboardPage({ dashboard, regressions, running, onRunAll }: DashboardPageProps) {
-  const latest = dashboard.latest_regression;
+export function DashboardPage({ dashboard, regressions, testcases, running, onRunAll }: DashboardPageProps) {
+  // The shared list updates from live regression events; the dashboard remains the persisted summary.
+  const latest = regressions[0] ?? dashboard.latest_regression;
+  const passedTestcases = testcases.length
+    ? testcases.filter((testcase) => testcase.result === "passed").length
+    : dashboard.passed_testcases;
+  const failedTestcases = testcases.length
+    ? testcases.filter((testcase) => testcase.result === "failed").length
+    : dashboard.failed_testcases;
+  const passRate = testcases.length
+    ? Math.round((passedTestcases / testcases.length) * 10000) / 100
+    : dashboard.pass_rate;
   const passedRuns = regressions.filter((regression) => regression.status === "passed").length;
   const failedRuns = regressions.filter((regression) => regression.status === "failed").length;
   const activeRuns = regressions.filter((regression) => regression.status === "queued").length;
@@ -26,7 +37,7 @@ export function DashboardPage({ dashboard, regressions, running, onRunAll }: Das
         ? `历史中有 ${failedRuns} 条失败任务，建议优先在回归中心查看对应场景日志。`
         : `共 ${passedRuns} 条历史任务已通过，最近一次回归结果稳定。`;
   return (
-    <div className="page-stack">
+    <div className="page-stack workbench-page dashboard-page">
       <section className="page-title-row">
         <div>
           <p className="eyebrow">PROJECT OVERVIEW</p>
@@ -41,8 +52,8 @@ export function DashboardPage({ dashboard, regressions, running, onRunAll }: Das
 
       <section className="metric-grid">
         <Metric label="验证用例" value={dashboard.total_testcases} hint="验证计划内的场景" tone="cyan" />
-        <Metric label="通过率" value={`${dashboard.pass_rate}%`} hint={`${dashboard.passed_testcases} 个用例最新结果通过`} tone="green" />
-        <Metric label="失败用例" value={dashboard.failed_testcases} hint="需要查看日志与波形" tone="red" />
+        <Metric label="通过率" value={`${passRate}%`} hint={`${passedTestcases} 个用例最新结果通过`} tone="green" />
+        <Metric label="失败用例" value={failedTestcases} hint="需要查看日志与波形" tone="red" />
         <Metric label="最近回归" value={latest ? `${latest.passed_cases}/${latest.total_cases}` : "--"} hint={latest ? latest.simulator : "尚未执行"} tone="amber" />
       </section>
 

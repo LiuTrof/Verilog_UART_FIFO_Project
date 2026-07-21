@@ -74,6 +74,8 @@ export interface WaveformSummary {
   size_bytes: number;
   modified_at: string;
   signal_count: number;
+  end_time: number | null;
+  timescale: string | null;
 }
 
 export interface WaveformDetails {
@@ -82,4 +84,6 @@ export interface WaveformDetails {
   matched_signals: Array<{ name: string; identifier: string; width: number }>;
   query: string;
   preview: string;
+  end_time: number | null;
+  timescale: string | null;
 }

@@ -14,6 +14,8 @@ from dv_platform.automation.models import resolve_project_root
 
 
 _VCD_VARIABLE = re.compile(r"\$var\s+\S+\s+(\d+)\s+(\S+)\s+([^\s$]+)")
+_VCD_TIMESCALE = re.compile(r"\$timescale\s+(.+?)\s+\$end", re.DOTALL)
+_VCD_TIMESTAMP = re.compile(rb"(?m)^#(\d+)\s*$")
 
 
 @dataclass(frozen=True)
@@ -22,6 +24,8 @@ class WaveformSummary:
     size_bytes: int
     modified_at: str
     signal_count: int
+    end_time: int | None
+    timescale: str | None
 
 
 class WaveformNotFoundError(FileNotFoundError):
@@ -83,6 +87,25 @@ class WaveformService:
             WaveformService._signal_cache[path] = (*cache_key, tuple(signals))
         return list(signals)
 
+    @staticmethod
+    def _timescale(path: Path) -> str | None:
+        with path.open("r", encoding="utf-8", errors="replace") as source:
+            header = source.read(16 * 1024)
+        match = _VCD_TIMESCALE.search(header)
+        return " ".join(match.group(1).split()) if match else None
+
+    @staticmethod
+    def _end_time(path: Path) -> int | None:
+        """Read the last VCD timestamp without scanning a multi-GB value-change stream."""
+
+        chunk_size = 256 * 1024
+        with path.open("rb") as source:
+            source.seek(0, 2)
+            size = source.tell()
+            source.seek(max(0, size - chunk_size))
+            timestamps = _VCD_TIMESTAMP.findall(source.read())
+        return int(timestamps[-1]) if timestamps else None
+
     def list_waveforms(self) -> list[WaveformSummary]:
         """Return all imported/generated VCDs with header-derived signal counts."""
 
@@ -95,6 +118,8 @@ class WaveformService:
                     size_bytes=stat.st_size,
                     modified_at=datetime.fromtimestamp(stat.st_mtime).astimezone().isoformat(timespec="seconds"),
                     signal_count=len(self._signals(path)),
+                    end_time=self._end_time(path),
+                    timescale=self._timescale(path),
                 )
             )
         return waveforms
@@ -114,6 +139,8 @@ class WaveformService:
             "matched_signals": matching[:200],
             "query": search,
             "preview": preview,
+            "end_time": self._end_time(path),
+            "timescale": self._timescale(path),
         }
 
     def import_vcd(self, source_path: Path, filename: str) -> WaveformSummary:
@@ -129,4 +156,6 @@ class WaveformService:
             size_bytes=stat.st_size,
             modified_at=datetime.fromtimestamp(stat.st_mtime).astimezone().isoformat(timespec="seconds"),
             signal_count=len(self._signals(target)),
+            end_time=self._end_time(target),
+            timescale=self._timescale(target),
         )

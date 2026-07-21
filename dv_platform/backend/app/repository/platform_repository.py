@@ -90,8 +90,8 @@ class PlatformRepository:
         with self._connection() as connection:
             connection.execute(
                 """INSERT INTO regressions(id, project_id, simulator, status, started_at, finished_at,
-                   total_cases, passed_cases, report_path)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   total_cases, passed_cases, report_path, requested_cases)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     regression.id,
                     regression.project_id,
@@ -102,6 +102,7 @@ class PlatformRepository:
                     regression.total_cases,
                     regression.passed_cases,
                     regression.report_path,
+                    regression.requested_cases,
                 ),
             )
 
@@ -115,17 +116,29 @@ class PlatformRepository:
                 (status, finished_at, total_cases, passed_cases, report_path, regression_id),
             )
 
-    def list_regressions(self, project_id: int, limit: int = 20) -> list[Regression]:
+    def list_regressions(self, project_id: int, limit: int | None = None) -> list[Regression]:
         with self._connection() as connection:
-            rows = connection.execute(
-                "SELECT * FROM regressions WHERE project_id = ? ORDER BY started_at DESC LIMIT ?", (project_id, limit)
-            ).fetchall()
+            if limit is None:
+                rows = connection.execute(
+                    "SELECT * FROM regressions WHERE project_id = ? ORDER BY started_at DESC", (project_id,)
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    "SELECT * FROM regressions WHERE project_id = ? ORDER BY started_at DESC LIMIT ?", (project_id, limit)
+                ).fetchall()
         return [self._regression(row) for row in rows]
 
     def get_regression(self, regression_id: str) -> Regression | None:
         with self._connection() as connection:
             row = connection.execute("SELECT * FROM regressions WHERE id = ?", (regression_id,)).fetchone()
         return self._regression(row) if row else None
+
+    def list_queued_regressions(self) -> list[Regression]:
+        with self._connection() as connection:
+            rows = connection.execute(
+                "SELECT * FROM regressions WHERE status = 'queued' ORDER BY started_at"
+            ).fetchall()
+        return [self._regression(row) for row in rows]
 
     def create_simulation(self, simulation: Simulation) -> None:
         with self._connection() as connection:

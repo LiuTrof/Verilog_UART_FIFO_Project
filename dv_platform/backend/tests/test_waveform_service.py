@@ -10,7 +10,8 @@ from dv_platform.backend.app.service.waveform_service import WaveformService
 def test_signal_index_stops_after_vcd_declaration_header(tmp_path: Path) -> None:
     waveform = tmp_path / "header_only.vcd"
     waveform.write_text(
-        """$scope module tb $end
+        """$timescale 1 ns $end
+$scope module tb $end
 $var wire 1 ! clk $end
 $upscope $end
 $enddefinitions $end
@@ -25,6 +26,8 @@ $var wire 1 ? must_not_be_indexed $end
 
     assert details["signal_count"] == 1
     assert details["matched_signals"] == [{"name": "tb.clk", "identifier": "!", "width": 1}]
+    assert details["end_time"] == 0
+    assert details["timescale"] == "1 ns"
 
 
 def test_imported_vcd_is_listed_and_inspectable(tmp_path: Path) -> None:
@@ -36,4 +39,5 @@ def test_imported_vcd_is_listed_and_inspectable(tmp_path: Path) -> None:
 
     assert imported.name == "uart_capture.vcd"
     assert imported.signal_count == 1
+    assert imported.timescale is None
     assert service.inspect(imported.name)["matched_signals"][0]["name"] == "dut.data"

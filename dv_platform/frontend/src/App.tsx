@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Activity, ChartNoAxesCombined, ChevronRight, FileChartColumn, LayoutDashboard, Menu, PanelLeftClose, PanelLeftOpen, TestTube2, X } from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Activity, ChartNoAxesCombined, ChevronRight, FileChartColumn, LayoutDashboard, Menu, Moon, PanelLeftClose, PanelLeftOpen, Sun, TestTube2, X } from "lucide-react";
 import { platformApi } from "./api";
 import { LoadingState } from "./components/LoadingState";
 import { DashboardPage } from "./pages/DashboardPage";
@@ -9,6 +9,7 @@ import { WaveformsPage } from "./pages/WaveformsPage";
 import type { Dashboard, Project, Regression, Simulation, TestCase, TestResult, WaveformDetails, WaveformSummary } from "./types";
 
 type View = "dashboard" | "testcases" | "regressions" | "waveforms";
+type Theme = "light" | "dark";
 
 interface NavigationItem {
   view: View;
@@ -28,10 +29,19 @@ const navigation: NavigationItem[] = [
 const apiErrorMessage = (reason: unknown, fallback: string) =>
   reason instanceof Error ? reason.message : fallback;
 
-const usesTunnelTransport = () =>
-  window.location.hostname.endsWith(".serveousercontent.com") ||
-  window.location.hostname.endsWith(".free.pinggy.net") ||
-  window.location.hostname.endsWith(".run.pinggy-free.link");
+const usesProgressPollingFallback = () => {
+  const hostname = window.location.hostname;
+  // Long-lived SSE responses can be buffered by tunnels and reverse proxies.
+  // Keep SSE for direct local development; every remotely opened workbench reads
+  // the persisted progress snapshot instead, so scenes appear as they complete.
+  return !["localhost", "127.0.0.1", "::1"].includes(hostname) && !hostname.endsWith(".localhost");
+};
+
+const initialTheme = (): Theme => {
+  const savedTheme = window.localStorage.getItem("chip-dv-theme");
+  if (savedTheme === "light" || savedTheme === "dark") return savedTheme;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+};
 
 export function App() {
   const [view, setView] = useState<View>("dashboard");
@@ -43,7 +53,6 @@ export function App() {
   const [selectedRegression, setSelectedRegression] = useState<Regression | null>(null);
   const [simulations, setSimulations] = useState<Simulation[]>([]);
   const [waveforms, setWaveforms] = useState<WaveformSummary[]>([]);
-  const [waveformsLoaded, setWaveformsLoaded] = useState(false);
   const [selectedWaveform, setSelectedWaveform] = useState<WaveformDetails | null>(null);
   const [waveformSearch, setWaveformSearch] = useState("");
   const [importingWaveform, setImportingWaveform] = useState(false);
@@ -55,9 +64,26 @@ export function App() {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= MOBILE_SIDEBAR_BREAKPOINT);
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > MOBILE_SIDEBAR_BREAKPOINT);
   const [documentVisible, setDocumentVisible] = useState(() => document.visibilityState !== "hidden");
+  const [theme, setTheme] = useState<Theme>(initialTheme);
   const waveformCache = useRef(new Map<string, WaveformDetails>());
   const waveformRequest = useRef<AbortController | null>(null);
   const selectedRegressionId = useRef<string | null>(null);
+  const testcasesLoadedRef = useRef(false);
+  const testcaseRefreshInFlight = useRef(false);
+  const queuedRegressionIds = useMemo(
+    () => regressions.filter((regression) => regression.status === "queued").map((regression) => regression.id),
+    [regressions]
+  );
+  const queuedRegressionKey = queuedRegressionIds.join("|");
+
+  useEffect(() => {
+    testcasesLoadedRef.current = testcasesLoaded;
+  }, [testcasesLoaded]);
+
+  useLayoutEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    window.localStorage.setItem("chip-dv-theme", theme);
+  }, [theme]);
 
   const refreshOverview = useCallback(async (activeProject: Project) => {
     const [nextDashboard, nextRegressions] = await Promise.all([
@@ -82,7 +108,6 @@ export function App() {
   const refreshWaveforms = useCallback(async (activeProject: Project) => {
     const nextWaveforms = await platformApi.waveforms(activeProject.id);
     setWaveforms(nextWaveforms);
-    setWaveformsLoaded(true);
   }, []);
 
   const selectRegression = useCallback((regression: Regression) => {
@@ -140,16 +165,16 @@ export function App() {
     };
   }, [isMobile, sidebarOpen]);
 
-  // Secondary pages fetch only when first opened, rather than on the dashboard refresh cadence.
+  // Secondary pages refresh only when opened or returned to, never on a background polling cadence.
   useEffect(() => {
     if (!project || view !== "testcases" || testcasesLoaded) return;
     void refreshTestcases(project).catch((reason: unknown) => setError(apiErrorMessage(reason, "无法读取测试用例。")));
   }, [project, refreshTestcases, testcasesLoaded, view]);
 
   useEffect(() => {
-    if (!project || view !== "waveforms" || waveformsLoaded) return;
+    if (!project || view !== "waveforms" || !documentVisible) return;
     void refreshWaveforms(project).catch((reason: unknown) => setError(apiErrorMessage(reason, "无法读取波形目录。")));
-  }, [project, refreshWaveforms, view, waveformsLoaded]);
+  }, [documentVisible, project, refreshWaveforms, view]);
 
   useEffect(() => {
     if (view !== "regressions" || !selectedRegression || selectedRegression.status === "queued") return;
@@ -169,51 +194,79 @@ export function App() {
   }, [selectedRegression?.id, selectedRegression?.status, view]);
 
   useEffect(() => {
-    if (
-      view !== "regressions" ||
-      !project ||
-      !selectedRegression ||
-      selectedRegression.status !== "queued" ||
-      !documentVisible
-    ) return;
-    const regressionId = selectedRegression.id;
+    if (!project || !documentVisible || !queuedRegressionIds.length) return;
     let active = true;
-    let eventSource: EventSource | null = null;
-    let timer: number | undefined;
-    let request: AbortController | null = null;
+    const eventSources = new Map<string, EventSource>();
+    const timers = new Map<string, number>();
+    const requests = new Map<string, AbortController>();
 
     const applyProgress = (progress: { regression: Regression; simulations: Simulation[] }) => {
       const { regression: updated, simulations: nextSimulations } = progress;
-      if (!active || selectedRegressionId.current !== updated.id) return false;
-      setSelectedRegression(updated);
-      setRegressions((current) => current.map((regression) => regression.id === updated.id ? updated : regression));
-      setSimulations(nextSimulations);
+      if (!active) return false;
+
+      setRegressions((current) => {
+        const exists = current.some((regression) => regression.id === updated.id);
+        return exists
+          ? current.map((regression) => regression.id === updated.id ? updated : regression)
+          : [updated, ...current];
+      });
+      setDashboard((current) => {
+        if (!current || current.latest_regression?.id !== updated.id) return current;
+        return { ...current, latest_regression: updated };
+      });
+      setSelectedRegression((current) => current?.id === updated.id ? updated : current);
+      if (selectedRegressionId.current === updated.id) setSimulations(nextSimulations);
+
+      const outcomeByCase = new Map(
+        nextSimulations.flatMap((simulation) => simulation.testcase_name ? [[simulation.testcase_name, simulation.status] as const] : [])
+      );
+      if (outcomeByCase.size) {
+        if (testcasesLoadedRef.current) {
+          setTestcases((current) => current.map((testcase) => {
+            const result = outcomeByCase.get(testcase.name);
+            return result ? { ...testcase, status: "ready", result } : testcase;
+          }));
+        } else if (!testcaseRefreshInFlight.current) {
+          testcaseRefreshInFlight.current = true;
+          void refreshTestcases(project)
+            .catch((reason: unknown) => setError(apiErrorMessage(reason, "无法同步测试用例状态。")))
+            .finally(() => { testcaseRefreshInFlight.current = false; });
+        }
+      }
       if (updated.status !== "queued") {
-        eventSource?.close();
+        eventSources.get(updated.id)?.close();
         void refreshOverview(project);
-        if (testcasesLoaded) void refreshTestcases(project);
+        void refreshTestcases(project);
       }
       setError(null);
       return updated.status === "queued";
     };
 
-    const pollProgress = async () => {
-      request = new AbortController();
+    const pollProgress = async (regressionId: string) => {
+      const request = new AbortController();
+      requests.set(regressionId, request);
       try {
         const progress = await platformApi.regressionProgress(regressionId, { signal: request.signal });
-        if (applyProgress(progress)) timer = window.setTimeout(() => void pollProgress(), TUNNEL_PROGRESS_POLL_MS);
+        if (applyProgress(progress)) {
+          timers.set(regressionId, window.setTimeout(() => void pollProgress(regressionId), TUNNEL_PROGRESS_POLL_MS));
+        }
       } catch (reason) {
         if (!request.signal.aborted && active) {
           setError(apiErrorMessage(reason, "无法刷新回归状态。"));
-          timer = window.setTimeout(() => void pollProgress(), TUNNEL_PROGRESS_POLL_MS);
+          timers.set(regressionId, window.setTimeout(() => void pollProgress(regressionId), TUNNEL_PROGRESS_POLL_MS));
         }
+      } finally {
+        requests.delete(regressionId);
       }
     };
 
-    if (usesTunnelTransport()) {
-      void pollProgress();
-    } else {
-      eventSource = new EventSource(`/api/v1/regressions/${regressionId}/events`);
+    queuedRegressionIds.forEach((regressionId) => {
+      if (usesProgressPollingFallback()) {
+        void pollProgress(regressionId);
+        return;
+      }
+      const eventSource = new EventSource(`/api/v1/regressions/${regressionId}/events`);
+      eventSources.set(regressionId, eventSource);
       eventSource.onmessage = (event) => {
         try {
           applyProgress(JSON.parse(event.data) as { regression: Regression; simulations: Simulation[] });
@@ -223,18 +276,19 @@ export function App() {
       };
       eventSource.onerror = () => {
         if (!active) return;
-        eventSource?.close();
+        eventSource.close();
         // Long-lived SSE can be dropped by an intermediary. Continue without user intervention.
-        void pollProgress();
+        void pollProgress(regressionId);
       };
-    }
+    });
+
     return () => {
       active = false;
-      eventSource?.close();
-      request?.abort();
-      if (timer !== undefined) window.clearTimeout(timer);
+      eventSources.forEach((eventSource) => eventSource.close());
+      requests.forEach((request) => request.abort());
+      timers.forEach((timer) => window.clearTimeout(timer));
     };
-  }, [documentVisible, project, refreshOverview, refreshTestcases, selectedRegression?.id, selectedRegression?.status, testcasesLoaded, view]);
+  }, [documentVisible, project, queuedRegressionKey, refreshOverview, refreshTestcases]);
 
   useEffect(() => () => waveformRequest.current?.abort(), []);
 
@@ -243,6 +297,7 @@ export function App() {
     try {
       const regression = await platformApi.startRegression(project.id, cases);
       setRegressions((current) => [regression, ...current.filter((item) => item.id !== regression.id)]);
+      setDashboard((current) => current ? { ...current, latest_regression: regression } : current);
       selectRegression(regression);
       setView("regressions");
       setError(null);
@@ -305,6 +360,7 @@ export function App() {
     try {
       const waveform = await platformApi.uploadWaveform(project.id, file);
       waveformCache.current.delete(waveform.name);
+      setWaveforms((current) => [waveform, ...current.filter((item) => item.name !== waveform.name)]);
       await refreshWaveforms(project);
       const details = await platformApi.waveform(project.id, waveform.name);
       waveformCache.current.set(waveform.name, details);
@@ -348,12 +404,12 @@ export function App() {
     if (!dashboard || !project) return null;
     if (view === "testcases") return <TestCasesPage cases={testcases} selected={selectedCases} search={testcaseSearch} resultFilter={testcaseResultFilter} running={running} onToggle={toggleCase} onSetVisibleSelection={setVisibleCaseSelection} onSearch={setTestcaseSearch} onResultFilter={setTestcaseResultFilter} onRunSelected={() => void runCases([...selectedCases])} />;
     if (view === "regressions") return <RegressionsPage regressions={regressions} selectedRegression={selectedRegression} simulations={simulations} running={running} onRunAll={() => void runCases(["all"])} onSelect={selectRegression} onRefresh={() => void refreshRegressionPage()} />;
-    if (view === "waveforms") return <WaveformsPage waveforms={waveforms} selected={filteredWaveform} search={waveformSearch} onSearch={setWaveformSearch} onSelect={(name) => void selectWaveform(name)} importing={importingWaveform} onUpload={(file) => void uploadWaveform(file)} />;
-    return <DashboardPage dashboard={dashboard} regressions={regressions} running={running} onRunAll={() => void runCases(["all"])} />;
+    if (view === "waveforms") return <WaveformsPage waveforms={waveforms} selected={filteredWaveform} search={waveformSearch} onSearch={setWaveformSearch} onSelect={(name) => void selectWaveform(name)} importing={importingWaveform} onUpload={(file) => void uploadWaveform(file)} onRefresh={() => { if (project) void refreshWaveforms(project); }} />;
+    return <DashboardPage dashboard={dashboard} regressions={regressions} testcases={testcases} running={running} onRunAll={() => void runCases(["all"])} />;
   }, [dashboard, filteredWaveform, importingWaveform, project, regressions, running, selectRegression, selectedCases, selectedRegression, simulations, testcaseResultFilter, testcaseSearch, testcases, view, waveformSearch, waveforms]);
 
   if (loading) return <LoadingState />;
-  return <div className={`app-shell ${sidebarOpen ? "sidebar-open" : "sidebar-collapsed"}`}>
+  return <div className={`app-shell theme-${theme} ${sidebarOpen ? "sidebar-open" : "sidebar-collapsed"}`}>
     <button className="sidebar-backdrop" aria-label="关闭导航" onClick={() => setSidebarOpen(false)} />
     <aside className="sidebar" aria-label="主导航">
       <div className="brand">
@@ -368,13 +424,24 @@ export function App() {
       </nav>
       <div className="sidebar-footer">
         <button
-          className="sidebar-toggle"
+          className="sidebar-footer-action theme-toggle"
+          onClick={() => setTheme((current) => current === "light" ? "dark" : "light")}
+          aria-label={`切换为${theme === "light" ? "深色" : "浅色"}模式`}
+          aria-pressed={theme === "dark"}
+          title={`切换为${theme === "light" ? "深色" : "浅色"}模式`}
+        >
+          {theme === "light" ? <Moon size={17} /> : <Sun size={17} />}
+          {sidebarOpen && <span>{theme === "light" ? "深色模式" : "浅色模式"}</span>}
+        </button>
+        <button
+          className="sidebar-footer-action sidebar-toggle"
           onClick={() => setSidebarOpen((value) => !value)}
           aria-label={sidebarOpen ? (isMobile ? "关闭导航" : "折叠导航") : "展开导航"}
           aria-expanded={sidebarOpen}
           title={sidebarOpen ? (isMobile ? "关闭导航" : "折叠导航") : "展开导航"}
         >
           {isMobile ? <X size={18} /> : sidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
+          {sidebarOpen && !isMobile && <span>收起</span>}
         </button>
       </div>
     </aside>

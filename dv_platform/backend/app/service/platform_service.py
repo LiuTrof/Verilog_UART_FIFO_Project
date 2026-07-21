@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import threading
 import uuid
 from pathlib import Path
@@ -106,20 +107,73 @@ class PlatformService:
             total_cases=len(case_names),
             passed_cases=0,
             report_path=None,
+            requested_cases=json.dumps(case_names),
         )
         self.repository.create_regression(regression)
-        worker = threading.Thread(
-            target=self._execute_regression,
-            args=(regression_id, project_id, case_names, simulator),
-            daemon=True,
-            name=f"dv-{regression_id}",
-        )
+        self._start_worker(regression_id, project_id, case_names, simulator)
+        return regression
+
+    def resume_queued_regressions(self) -> None:
+        """Resume durable queued work after a dev reload or API process restart."""
+
+        for regression in self.repository.list_queued_regressions():
+            case_names = self._requested_case_names(regression)
+            if not case_names:
+                self._fail_interrupted_regression(regression, "Missing persisted testcase selection for queued regression.")
+                continue
+            self._start_worker(
+                regression.id,
+                regression.project_id,
+                case_names,
+                self._resume_simulator_mode(regression.simulator),
+            )
+
+    def _requested_case_names(self, regression: Regression) -> list[str]:
+        if regression.requested_cases:
+            try:
+                case_names = json.loads(regression.requested_cases)
+            except json.JSONDecodeError:
+                return []
+            if isinstance(case_names, list) and all(isinstance(name, str) and name in CASE_BY_NAME for name in case_names):
+                return case_names
+            return []
+        # Compatibility for queued runs created before requested_cases was persisted.
+        return [case.name for case in TEST_CASES] if regression.total_cases == len(TEST_CASES) else []
+
+    @staticmethod
+    def _resume_simulator_mode(simulator: str) -> str:
+        """Map the persisted simulator label back to a compile selection mode."""
+
+        if simulator == "iverilog-legacy":
+            return "legacy"
+        if simulator.endswith("-uvm"):
+            return "uvm"
+        return "auto"
+
+    def _start_worker(self, regression_id: str, project_id: int, case_names: list[str], simulator: str) -> None:
         with self._run_lock:
+            existing = self._runs.get(regression_id)
+            if existing and existing.is_alive():
+                return
+            worker = threading.Thread(
+                target=self._execute_regression,
+                args=(regression_id, project_id, case_names, simulator),
+                daemon=True,
+                name=f"dv-{regression_id}",
+            )
             self._runs[regression_id] = worker
         with self._progress_condition:
-            self._progress_versions[regression_id] = 0
+            self._progress_versions.setdefault(regression_id, 0)
         worker.start()
-        return regression
+
+    def _fail_interrupted_regression(self, regression: Regression, reason: str) -> None:
+        log_path = resolve_project_root() / "sim" / "dv_platform" / "log" / f"{regression.id}_resume.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text(reason + "\n", encoding="utf-8")
+        self.repository.finish_regression(
+            regression.id, "failed", utc_now(), regression.total_cases, regression.passed_cases, str(log_path)
+        )
+        self._publish_progress(regression.id)
 
     def _publish_progress(self, regression_id: str) -> None:
         """Wake the single live-progress stream after a durable state change."""
@@ -134,9 +188,13 @@ class PlatformService:
         try:
             artifact = compile_testbench(simulator)
             runner = SimulatorRunner(artifact)
+            existing = {simulation.testcase_name: simulation for simulation in self.repository.list_simulations(regression_id)}
             results = []
-            passed_cases = 0
+            passed_cases = sum(simulation.status == "passed" for simulation in existing.values())
             for case_name in case_names:
+                if case_name in existing:
+                    results.append(self._simulation_result(existing[case_name], artifact.simulator))
+                    continue
                 result = runner.run_case(case_name, regression_id)
                 results.append(result)
                 if result.status == "passed":
@@ -177,7 +235,7 @@ class PlatformService:
             self._publish_progress(regression_id)
             # Legacy runs report functional self-checking only; commercial coverage import remains explicit.
             self.repository.write_coverage(regression_id, "not_collected", (None, None, None, None))
-        except (CompileError, OSError, RuntimeError) as exc:
+        except (CompileError, OSError, RuntimeError, ValueError) as exc:
             log_path = resolve_project_root() / "sim" / "dv_platform" / "log" / f"{regression_id}_setup.log"
             log_path.parent.mkdir(parents=True, exist_ok=True)
             log_path.write_text(str(exc) + "\n", encoding="utf-8")
@@ -194,6 +252,24 @@ class PlatformService:
         finally:
             with self._run_lock:
                 self._runs.pop(regression_id, None)
+
+    @staticmethod
+    def _simulation_result(simulation: Simulation, simulator: str):
+        """Convert a persisted case result back into report data when resuming a regression."""
+
+        from dv_platform.automation.models import SimulationResult
+
+        return SimulationResult(
+            case_name=simulation.testcase_name or Path(simulation.log_path).stem.rsplit("_", 1)[-1],
+            status=simulation.status,  # type: ignore[arg-type]
+            duration_seconds=simulation.runtime_seconds,
+            simulator=simulator,
+            log_path=simulation.log_path,
+            checked_bytes=simulation.checked_bytes,
+            error_count=simulation.error_count,
+            pending_bytes=simulation.pending_bytes,
+            failure_reason=simulation.failure_reason,
+        )
 
     def list_regressions(self, project_id: int) -> list[Regression]:
         self._project(project_id)
