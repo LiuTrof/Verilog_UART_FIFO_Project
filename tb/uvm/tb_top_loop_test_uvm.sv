@@ -4,7 +4,8 @@ import uvm_pkg::*;
 import uart_fifo_pkg::*;
 
 module tb_top_loop_test_uvm;
-    localparam time CLK_PERIOD_NS = 10ns;
+    // Use an equivalent 10 MHz simulation clock; production RTL defaults remain 100 MHz.
+    localparam time CLK_PERIOD_NS = 100ns;
 
     logic clk = 1'b0;
 
@@ -12,7 +13,10 @@ module tb_top_loop_test_uvm;
     fifo_boundary_if     fifo_vif(clk);
 
     // UART RX -> RX FIFO -> loopback controller -> TX FIFO -> UART TX.
-    top_loop_test dut (
+    top_loop_test #(
+        .UART_CLK_HZ(10_000_000),
+        .UART_BAUD  (9_600)
+    ) dut (
         .clk  (clk),
         .reset(uart_vif.reset),
         .rx   (uart_vif.rx),
@@ -52,7 +56,16 @@ module tb_top_loop_test_uvm;
 
         if ($value$plusargs("VCD=%s", vcd_file)) begin
             $dumpfile(vcd_file);
-            $dumpvars(0, tb_top_loop_test_uvm);
+            // Capture the transaction path and FIFO state, but not the 100 MHz clock.
+            // A full-clock VCD turns long UART streams into multi-gigabyte files.
+            $dumpvars(0, uart_vif.reset, uart_vif.rx, uart_vif.tx,
+                      uart_vif.driver_data, uart_vif.monitor_data,
+                      dut.U_UART_FIFO.w_rx_done, dut.U_UART_FIFO.w_tx_done,
+                      dut.U_UART_FIFO.rx_data, dut.U_UART_FIFO.rx_empty,
+                      dut.U_UART_FIFO.U_Rx_Fifo.full, dut.U_UART_FIFO.U_Rx_Fifo.empty,
+                      dut.U_UART_FIFO.U_Tx_Fifo.full, dut.U_UART_FIFO.U_Tx_Fifo.empty,
+                      fifo_vif.reset, fifo_vif.wr_en, fifo_vif.rd_en, fifo_vif.wdata,
+                      fifo_vif.full, fifo_vif.empty, fifo_vif.rdata);
         end
 
         uvm_config_db#(virtual uart_fifo_if)::set(null, "uvm_test_top.env.agent*", "vif", uart_vif);

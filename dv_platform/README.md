@@ -52,9 +52,12 @@ Artifacts are written below `sim/dv_platform/`:
 - `report/`: immutable JSON regression reports
 - `platform.db`: SQLite project and execution history
 
-Each platform-triggered testcase also emits a VCD to `sim/uart_fifo_sim/` using the regression
-identifier. The waveform page discovers those files automatically, so a frontend run can be
-traced from its database record through the raw log and JSON report to the corresponding signals.
+Platform-triggered smoke and medium-length scenarios emit compact VCDs to `sim/uart_fifo_sim/`
+using the regression identifier. The 64-byte and 128-byte deep-stream scenarios retain their
+raw logs and JSON reports without a VCD, preventing a 100 MHz clock trace from creating
+multi-gigabyte waveform files. The waveform page discovers generated VCDs automatically, so a
+frontend run can be traced from its database record through the raw log and JSON report to the
+corresponding signals.
 
 Coverage values are intentionally `not_collected` for Icarus. The platform does not present
 invented line, branch, FSM, or functional coverage. A commercial simulator coverage export can

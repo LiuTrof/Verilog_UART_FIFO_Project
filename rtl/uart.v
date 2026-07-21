@@ -384,7 +384,10 @@
 `timescale 1ns / 1ps  // 仿真时间单位为 1 ns，时间精度为 1 ps。
 
 // UART 顶层：实例化波特率发生器、发送器和接收器。
-module uart (
+module uart #(
+    parameter integer CLK_HZ = 100_000_000,  // 系统时钟频率，默认对应综合目标。
+    parameter integer BAUD   = 9_600         // UART 目标波特率。
+) (
     input        clk,      // 100 MHz 系统时钟。
     input        reset,    // 高有效异步复位。
     //Transmitter 
@@ -400,8 +403,11 @@ module uart (
 
     wire w_br_tick;  // 16 倍波特率节拍，发送器和接收器共用。
 
-    // 100 MHz 时钟分频后生成 9600 * 16 Hz 的节拍。
-    baudrate_generator U_BAUDRATE_GEN (
+    // 将系统时钟分频为 BAUD * 16 Hz 的节拍。
+    baudrate_generator #(
+        .CLK_HZ(CLK_HZ),
+        .BAUD  (BAUD)
+    ) U_BAUDRATE_GEN (
         .clk    (clk),       // 输入系统时钟。
         .reset  (reset),     // 复位分频计数器。
         .br_tick(w_br_tick)  // 输出单周期节拍脉冲。
@@ -432,14 +438,18 @@ endmodule  // uart 顶层模块结束。
 
 
 // 波特率发生器：把 100 MHz 系统时钟分频为 UART 的 16 倍采样节拍。
-module baudrate_generator (
+module baudrate_generator #(
+    parameter integer CLK_HZ = 100_000_000,
+    parameter integer BAUD   = 9_600
+) (
     input  clk,      // 100 MHz 系统时钟。
     input  reset,    // 高有效异步复位。
-    output br_tick   // 每 651 个系统时钟拉高一次的单周期脉冲。
+    output br_tick   // 每 CLOCKS_PER_TICK 个系统时钟拉高一次的单周期脉冲。
 );
 
-    // 100_000_000 / 9600 / 16 = 651（整数截断），计数器需要能计到 650。
-    reg [$clog2(100_000_000 / 9600 / 16) - 1:0] counter_reg, counter_next;
+    // 每个 16 倍采样节拍需要的系统时钟数。综合默认值为 651。
+    localparam integer CLOCKS_PER_TICK = CLK_HZ / BAUD / 16;
+    reg [$clog2(CLOCKS_PER_TICK) - 1:0] counter_reg, counter_next;
     reg tick_reg, tick_next;  // 将组合判断结果寄存后作为稳定的单周期节拍。
 
     assign br_tick = tick_reg;  // 对外导出当前寄存的节拍脉冲。
@@ -459,8 +469,8 @@ module baudrate_generator (
     always @(*) begin
         counter_next = counter_reg;  // 默认保持，避免综合出锁存器。
         tick_next    = 1'b0;         // 默认不产生节拍，保证节拍宽度只有一个 clk。
-        if (counter_reg == 100_000_000 / 9600 / 16 - 1) begin
-            counter_next = 0;        // 计满 650 后从头开始下一轮分频。
+        if (counter_reg == CLOCKS_PER_TICK - 1) begin
+            counter_next = 0;        // 计满后从头开始下一轮分频。
             tick_next    = 1'b1;     // 本轮结束，输出一个采样节拍。
         end else begin
             counter_next = counter_reg + 1;  // 尚未计满，继续计数。

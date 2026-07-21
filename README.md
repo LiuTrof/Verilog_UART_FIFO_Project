@@ -2,7 +2,7 @@
 
 这是一个基于 Verilog 的 UART + FIFO 回环验证项目。项目不修改原有 RTL 功能，而是在其外部搭建了可重复运行、自检和波形定位的 UVM 模块级验证环境。
 
-原过程式环境的完整回归记录为：26 个 UART 字节检查完成、预期队列无残留、错误数为 0。迁移后的 UVM 环境保持相同场景；请使用支持 UVM 1.2 的仿真器重新执行回归。
+当前完整回归包含 10 个场景、282 个 UART 端到端字节检查，覆盖单字节、多字节、20/64/128 字节递增流、数据模式、FIFO 边界与复位恢复。请使用支持 UVM 1.2 的仿真器执行标准 UVM 回归；平台在无商用仿真器时提供明确标记的 Icarus 兼容自检回归。
 
 ## 设计与验证架构
 
@@ -48,11 +48,16 @@ UVM 结构、文件职责和工具要求详见 [UVM 迁移说明](doc/changes/02
 | `single` | `./run.sh single` | 单字节 `A5` 端到端回环。 |
 | `multi` | `./run.sh multi` | `11 22 33 44` 的数据一致性与顺序。 |
 | `stream` | `./run.sh stream` | 20 字节递增序列 `00` 至 `13`。 |
+| `multi16` | `./run.sh multi16` | 16 字节 corner value 序列：全零、全一、交替位、边界值与非对称值。 |
+| `stream64` | `./run.sh stream64` | 64 字节递增序列 `00` 至 `3F`。 |
+| `stream128` | `./run.sh stream128` | 128 字节递增序列 `00` 至 `7F`。 |
+| `patterns` | `./run.sh patterns` | 32 字节交替位、walking bit 和 corner value 模式。 |
 | `fifo` | `./run.sh fifo` | 独立 FIFO 连续写 8 次后的 `full`，读 8 次后的 `empty`。 |
 | `reset` | `./run.sh reset` | 复位后重新发送 `A5` 的功能恢复。 |
-| `all` | `./run.sh all` | 执行完整回归。 |
+| `reset_stream` | `./run.sh reset_stream` | 复位后 16 字节 corner value 流的功能恢复。 |
+| `all` | `./run.sh all` | 执行完整的 10 场景、282 字节检查回归。 |
 
-`multi` 与 `stream` 使用帧间保护间隔，因此验证的是当前设计覆盖范围内的数据一致性和顺序性，不是 FIFO 灌满后的极限吞吐压力测试。
+所有多字节流场景使用帧间保护间隔，因此验证的是当前设计覆盖范围内的数据一致性和顺序性，不是 FIFO 灌满后的极限吞吐压力测试。
 
 ## 运行仿真
 

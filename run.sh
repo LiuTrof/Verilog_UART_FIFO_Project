@@ -4,7 +4,7 @@
 # 文件作用：项目统一 UVM 仿真入口。
 # 功能：使用 VCS、Questa 或 Xcelium 编译 RTL/UVM testbench，运行 +TEST 指定的
 # 场景并保存日志；可选生成 VCD 和打开对应 GTKWave 视图。
-# 用法：./run.sh {single|multi|stream|fifo|reset|all} [--wave | --vcd <路径>]
+# 用法：./run.sh {single|multi|stream|multi16|stream64|stream128|patterns|fifo|reset|reset_stream|all} [--wave | --vcd <路径>]
 # 说明：all 是完整回归；--wave 只支持单独场景，避免大 VCD 拖慢回归。
 # ============================================================================
 set -euo pipefail
@@ -29,21 +29,21 @@ case "${2:-}" in
         fi
         ;;
     *)
-        echo "用法：$0 {single|multi|stream|fifo|reset|all} [--wave | --vcd <路径>]"
+        echo "用法：$0 {single|multi|stream|multi16|stream64|stream128|patterns|fifo|reset|reset_stream|all} [--wave | --vcd <路径>]"
         exit 2
         ;;
 esac
 
 if [[ "$CASE_NAME" == "all" && "$OPEN_WAVE" == "1" ]]; then
     echo "波形导出只支持单独场景。"
-    echo "请运行：./run.sh {single|multi|stream|fifo|reset} --wave"
+    echo "请运行：./run.sh {single|multi|stream|multi16|stream64|stream128|patterns|fifo|reset|reset_stream} --wave"
     exit 2
 fi
 
 case "$CASE_NAME" in
-    all|single|multi|stream|fifo|reset) ;;
+    all|single|multi|stream|multi16|stream64|stream128|patterns|fifo|reset|reset_stream) ;;
     *)
-        echo "用法：$0 {all|single|multi|stream|fifo|reset} [--wave | --vcd <路径>]"
+        echo "用法：$0 {all|single|multi|stream|multi16|stream64|stream128|patterns|fifo|reset|reset_stream} [--wave | --vcd <路径>]"
         exit 2
         ;;
 esac
@@ -122,6 +122,7 @@ if [[ "$OPEN_WAVE" == "1" ]]; then
         single) VIEW_FILE="$PROJECT_DIR/gtkwave_views/01_single_byte_loopback.gtkw" ;;
         multi) VIEW_FILE="$PROJECT_DIR/gtkwave_views/02_multi_byte_loopback.gtkw" ;;
         stream) VIEW_FILE="$PROJECT_DIR/gtkwave_views/03_stream_loopback.gtkw" ;;
+        multi16|stream64|stream128|patterns|reset_stream) VIEW_FILE="$PROJECT_DIR/gtkwave_views/03_stream_loopback.gtkw" ;;
         fifo) VIEW_FILE="$PROJECT_DIR/gtkwave_views/04_fifo_boundary.gtkw" ;;
         reset) VIEW_FILE="$PROJECT_DIR/gtkwave_views/05_reset_recovery.gtkw" ;;
         all) VIEW_FILE="" ;;

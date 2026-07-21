@@ -17,8 +17,13 @@ TEST_CASES: tuple[TestCaseDefinition, ...] = (
     TestCaseDefinition("single", "Single-byte A5 UART loopback.", "DV Platform", 1),
     TestCaseDefinition("multi", "Ordered 11/22/33/44 UART loopback.", "DV Platform", 4),
     TestCaseDefinition("stream", "Twenty-byte incrementing UART loopback.", "DV Platform", 20),
+    TestCaseDefinition("multi16", "Sixteen-byte mixed-value ordered UART loopback.", "DV Platform", 16),
+    TestCaseDefinition("stream64", "Sixty-four-byte incrementing UART data stream.", "DV Platform", 64),
+    TestCaseDefinition("stream128", "One-hundred-twenty-eight-byte incrementing UART data stream.", "DV Platform", 128),
+    TestCaseDefinition("patterns", "Thirty-two-byte alternating, walking-bit, and corner-value stream.", "DV Platform", 32),
     TestCaseDefinition("fifo", "Standalone FIFO full/empty boundary behavior.", "DV Platform", 0),
     TestCaseDefinition("reset", "UART loopback recovery after reset.", "DV Platform", 1),
+    TestCaseDefinition("reset_stream", "Reset recovery followed by a sixteen-byte mixed-value stream.", "DV Platform", 16),
 )
 CASE_BY_NAME = {case.name: case for case in TEST_CASES}
 

@@ -8,8 +8,10 @@
 
 module tb_top_loop_test;
 
-    localparam integer CLK_PERIOD_NS      = 10;                   // 100 MHz 时钟周期：10 ns。
-    localparam integer BIT_PERIOD_NS      = 104_160;              // 9600 波特率下一个 UART 比特约 104.16 us。
+    // 验证仿真采用 10 MHz 等效时钟，减少逐时钟事件量；RTL 默认综合参数仍为 100 MHz。
+    // 10 MHz / 65 / 16 约为 9615 波特，Driver、Monitor 与 DUT 使用同一精确节拍。
+    localparam integer CLK_PERIOD_NS      = 100;                  // 验证仿真时钟周期：100 ns。
+    localparam integer BIT_PERIOD_NS      = 104_000;              // 65 * 16 * 100 ns。
     localparam integer HALF_BIT_PERIOD_NS = BIT_PERIOD_NS / 2;    // 用于 Monitor 在数据位中间采样。
     localparam integer FRAME_GAP_NS       = BIT_PERIOD_NS * 6;    // Driver 在帧之间保留的额外保护间隔。
 
@@ -32,7 +34,10 @@ module tb_top_loop_test;
     wire [7:0] fifo_boundary_model_rdata;         // 边界模型读出数据。
 
     // 实例化待测设计：UART RX -> RX FIFO -> loopback -> TX FIFO -> UART TX。
-    top_loop_test dut (
+    top_loop_test #(
+        .UART_CLK_HZ(10_000_000),
+        .UART_BAUD  (9_600)
+    ) dut (
         .clk  (clk),    // 提供时钟。
         .reset(reset),  // 提供复位。
         .rx   (rx),     // Driver 产生的串行输入。
@@ -54,7 +59,7 @@ module tb_top_loop_test;
         .rdata(fifo_boundary_model_rdata)  // 保留读数据供波形调试。
     );
 
-    // 每隔半个周期翻转一次，因此完整时钟周期为 CLK_PERIOD_NS=10 ns。
+    // 每隔半个周期翻转一次，因此完整时钟周期为 CLK_PERIOD_NS=100 ns。
     always #(CLK_PERIOD_NS / 2) clk = ~clk;
 
     // `include 相当于把这些文件内容直接插入本 module 内；这些 task 可直接访问 rx、tx、
@@ -90,7 +95,7 @@ module tb_top_loop_test;
         reg [8*256-1:0] vcd_file;  // 保存 +VCD=<文件名> 传入的 VCD 路径字符串。
         if ($value$plusargs("VCD=%s", vcd_file)) begin
             $dumpfile(vcd_file);  // 指定 VCD 输出文件。
-            $dumpvars(0, clk, reset, rx, tx);  // 导出顶层时钟、复位和串行线。
+            $dumpvars(0, reset, rx, tx);  // 不导出 100 MHz clk，避免长流波形被时钟翻转淹没。
             $dumpvars(0, driver_data, monitor_data);  // 导出验证层两侧的并行字节。
             $dumpvars(0, dut.U_UART_FIFO.w_rx_done, dut.U_UART_FIFO.w_tx_done,
                       dut.U_UART_FIFO.rx_data, dut.U_UART_FIFO.rx_empty,

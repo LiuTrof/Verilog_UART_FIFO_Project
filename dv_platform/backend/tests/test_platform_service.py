@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from dv_platform.automation.regression import TEST_CASES
 from dv_platform.backend.app.model.entities import Regression, Simulation
 from dv_platform.backend.app.service.platform_service import PlatformService
 
@@ -16,7 +17,18 @@ def test_bootstrap_creates_project_and_verification_plan(tmp_path: Path) -> None
     testcases = service.list_testcases(project.id)
 
     assert project.name == "UART FIFO Verification"
-    assert [case.name for case in testcases] == ["single", "multi", "stream", "fifo", "reset"]
+    assert [case.name for case in testcases] == [
+        "single",
+        "multi",
+        "stream",
+        "multi16",
+        "stream64",
+        "stream128",
+        "patterns",
+        "fifo",
+        "reset",
+        "reset_stream",
+    ]
 
 
 def test_dashboard_reflects_seeded_project(tmp_path: Path) -> None:
@@ -25,9 +37,19 @@ def test_dashboard_reflects_seeded_project(tmp_path: Path) -> None:
 
     dashboard = service.dashboard(project.id)
 
-    assert dashboard["total_testcases"] == 5
+    assert dashboard["total_testcases"] == 10
     assert dashboard["pass_rate"] == 0.0
     assert dashboard["coverage"]["source"] is None
+
+
+def test_bootstrap_adds_new_cases_to_an_existing_project(tmp_path: Path) -> None:
+    service = PlatformService(tmp_path / "platform.db")
+    project = service.repository.create_project("UART FIFO Verification", "existing", "main", "2026-01-01T00:00:00+00:00")
+    service.repository.create_testcase(project.id, "single", "existing", "DV Platform", 1)
+
+    service.bootstrap()
+
+    assert [case.name for case in service.list_testcases(project.id)] == [case.name for case in TEST_CASES]
 
 
 def test_regression_progress_exposes_completed_case_before_run_finishes(tmp_path: Path) -> None:
@@ -101,10 +123,12 @@ def test_queued_regression_is_resumed_with_a_valid_simulator_mode(tmp_path: Path
         status="queued",
         started_at="2026-01-01T00:00:00+00:00",
         finished_at=None,
-        total_cases=5,
+        total_cases=10,
         passed_cases=3,
         report_path=None,
-        requested_cases=json.dumps(["single", "multi", "stream", "fifo", "reset"]),
+        requested_cases=json.dumps([
+            "single", "multi", "stream", "multi16", "stream64", "stream128", "patterns", "fifo", "reset", "reset_stream"
+        ]),
     )
     service.repository.create_regression(regression)
     resumed: list[tuple[str, int, list[str], str]] = []
@@ -113,7 +137,7 @@ def test_queued_regression_is_resumed_with_a_valid_simulator_mode(tmp_path: Path
     service.resume_queued_regressions()
 
     assert resumed == [
-        ("reg-resume-legacy", project.id, ["single", "multi", "stream", "fifo", "reset"], "legacy")
+        ("reg-resume-legacy", project.id, ["single", "multi", "stream", "multi16", "stream64", "stream128", "patterns", "fifo", "reset", "reset_stream"], "legacy")
     ]
 
 
@@ -129,7 +153,7 @@ def test_queued_legacy_regression_without_saved_selection_remains_recoverable(
         status="queued",
         started_at="2026-01-01T00:00:00+00:00",
         finished_at=None,
-        total_cases=5,
+        total_cases=10,
         passed_cases=3,
         report_path=None,
     )
@@ -140,5 +164,5 @@ def test_queued_legacy_regression_without_saved_selection_remains_recoverable(
     service.resume_queued_regressions()
 
     assert resumed == [
-        ("reg-resume-compatibility", project.id, ["single", "multi", "stream", "fifo", "reset"], "legacy")
+        ("reg-resume-compatibility", project.id, ["single", "multi", "stream", "multi16", "stream64", "stream128", "patterns", "fifo", "reset", "reset_stream"], "legacy")
     ]

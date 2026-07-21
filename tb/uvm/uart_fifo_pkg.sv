@@ -6,7 +6,8 @@ package uart_fifo_pkg;
     import uvm_pkg::*;
     `include "uvm_macros.svh"
 
-    localparam time BIT_PERIOD_NS      = 104_160ns;
+    // Matches the 10 MHz simulation-clock parameter used by the UVM top.
+    localparam time BIT_PERIOD_NS      = 104_000ns;
     localparam time HALF_BIT_PERIOD_NS = BIT_PERIOD_NS / 2;
     localparam time FRAME_GAP_NS       = BIT_PERIOD_NS * 6;
 
@@ -339,8 +340,13 @@ package uart_fifo_pkg;
                 "single": run_single();
                 "multi":  run_multi();
                 "stream": run_stream();
+                "multi16": run_multi16();
+                "stream64": run_stream64();
+                "stream128": run_stream128();
+                "patterns": run_patterns();
                 "fifo":   run_fifo_boundary();
                 "reset":  run_reset_recovery();
+                "reset_stream": run_reset_stream_recovery();
                 "all":    run_all();
                 default: begin
                     `uvm_fatal("TEST", $sformatf("unsupported +TEST=%s", selected_test))
@@ -385,6 +391,51 @@ package uart_fifo_pkg;
             send_bytes(payloads, 12 * BIT_PERIOD_NS);
         endtask
 
+        protected task run_multi16();
+            bit [7:0] payloads[$] = '{
+                8'h00, 8'hFF, 8'h55, 8'hAA, 8'h01, 8'h80, 8'h7F, 8'hFE,
+                8'h3C, 8'hC3, 8'h0F, 8'hF0, 8'h12, 8'h21, 8'h96, 8'h69
+            };
+            env.agent.driver.apply_reset();
+            send_bytes(payloads, 12 * BIT_PERIOD_NS);
+        endtask
+
+        protected task run_stream64();
+            bit [7:0] payloads[$];
+            for (int index = 0; index < 64; index++) begin
+                payloads.push_back(index[7:0]);
+            end
+            env.agent.driver.apply_reset();
+            send_bytes(payloads, 12 * BIT_PERIOD_NS);
+        endtask
+
+        protected task run_stream128();
+            bit [7:0] payloads[$];
+            for (int index = 0; index < 128; index++) begin
+                payloads.push_back(index[7:0]);
+            end
+            env.agent.driver.apply_reset();
+            send_bytes(payloads, 12 * BIT_PERIOD_NS);
+        endtask
+
+        protected task run_patterns();
+            bit [7:0] payloads[$];
+            for (int index = 0; index < 32; index++) begin
+                case (index % 8)
+                    0: payloads.push_back(8'h00);
+                    1: payloads.push_back(8'hFF);
+                    2: payloads.push_back(8'h55);
+                    3: payloads.push_back(8'hAA);
+                    4: payloads.push_back(8'h01 << ((index / 8) % 8));
+                    5: payloads.push_back(8'h80 >> ((index / 8) % 8));
+                    6: payloads.push_back(8'h0F);
+                    default: payloads.push_back(8'hF0);
+                endcase
+            end
+            env.agent.driver.apply_reset();
+            send_bytes(payloads, 12 * BIT_PERIOD_NS);
+        endtask
+
         protected task run_fifo_boundary();
             fifo_vif.reset <= 1'b1;
             fifo_vif.wr_en <= 1'b0;
@@ -424,12 +475,21 @@ package uart_fifo_pkg;
             send_bytes(payloads, 12 * BIT_PERIOD_NS);
         endtask
 
+        protected task run_reset_stream_recovery();
+            run_multi16();
+        endtask
+
         protected task run_all();
             run_single();
             run_multi();
             run_stream();
+            run_multi16();
+            run_stream64();
+            run_stream128();
+            run_patterns();
             run_fifo_boundary();
             run_reset_recovery();
+            run_reset_stream_recovery();
         endtask
     endclass
 

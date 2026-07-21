@@ -30,7 +30,11 @@ class SimulatorRunner:
         if self.artifact.execution_mode == "uvm":
             command = ["bash", str(self.artifact.executable), case_name, "--vcd", str(waveform_path)]
         else:
-            command = ["vvp", str(self.artifact.executable), f"+TEST={case_name}", f"+VCD={waveform_path}"]
+            command = ["vvp", str(self.artifact.executable), f"+TEST={case_name}"]
+            # Keep a compact representative trace for short and medium scenarios.
+            # Long streams remain fully self-checking through their logs and reports.
+            if case_name not in {"stream64", "stream128"}:
+                command.append(f"+VCD={waveform_path}")
         started = time.monotonic()
         completed = subprocess.run(command, cwd=self.project_root, text=True, capture_output=True, check=False)
         duration_seconds = time.monotonic() - started

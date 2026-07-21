@@ -2,7 +2,10 @@
 
 // UART 加双 FIFO 的封装模块：将串行 RX 转为缓存字节，交给顶层回环逻辑，
 // 再将缓存的 TX 字节重新串行化输出。
-module uart_fifo (
+module uart_fifo #(
+    parameter integer UART_CLK_HZ = 100_000_000,  // 综合默认保持 100 MHz。
+    parameter integer UART_BAUD   = 9_600         // UART 目标波特率。
+) (
     input        clk,       // 共享设计时钟。
     input        reset,     // 高有效异步复位。
     output       tx,        // 发送器产生的 UART 串行位流。
@@ -22,7 +25,10 @@ module uart_fifo (
     wire [7:0] w_rx_data;        // UART 接收器还原、即将写入 RX FIFO 的字节。
 
     // 一个 uart 实例同时包含发送器和接收器，二者共用一个波特率节拍。
-    uart U_UART (
+    uart #(
+        .CLK_HZ(UART_CLK_HZ),
+        .BAUD  (UART_BAUD)
+    ) U_UART (
         .clk    (clk),                  // 用系统时钟驱动 UART 状态机。
         .reset  (reset),                // 复位波特率发生器、发送器和接收器。
         .tx     (tx),                   // 导出发送器的串行输出。

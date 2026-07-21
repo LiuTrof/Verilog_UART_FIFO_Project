@@ -1,7 +1,7 @@
 // ============================================================================
 // 文件作用：验证环境的测试用例集合与 +TEST 场景选择逻辑。
-// 功能：定义单字节、多字节、20 字节序列、独立 FIFO 边界和 reset recovery 场景。
-// 说明：multi/stream 每发送一帧都会等待本帧 Monitor 完成，并保留保护间隔；
+// 功能：定义单字节、多字节、20/64/128 字节序列、数据模式、FIFO 边界和 reset recovery 场景。
+// 说明：多字节序列每发送一帧都会等待本帧 Monitor 完成，并保留保护间隔；
 // 它们验证端到端数据顺序，不是将 DUT 内部 FIFO 灌满的吞吐压力测试。
 // 注意：本文件由 tb_top_loop_test.v include，不是独立 module。
 // ============================================================================
@@ -58,7 +58,7 @@ endtask  // run_safe_loopback_sequence 结束。
 // 按模式与索引生成每个 testcase 使用的激励数据。
 function [7:0] get_test_data;
     input integer index;    // 当前数据在序列中的位置。
-    input integer pattern;  // 0=A5，1=固定四字节，2=递增序列。
+    input integer pattern;  // 0=A5，1=固定序列，2=递增，3=混合，4=压力模式。
     begin
         case (pattern)
             0: get_test_data = 8'hA5;  // 单字节与 reset recovery 使用固定 A5。
@@ -71,7 +71,39 @@ function [7:0] get_test_data;
                     default: get_test_data = index[7:0];  // 超出四字节时备用的递增值。
                 endcase
             end
-            2: get_test_data = index[7:0];  // 20 字节场景产生 00 至 13。
+            2: get_test_data = index[7:0];  // 递增序列：00 至 FF 回绕。
+            3: begin
+                case (index % 16)
+                    0:  get_test_data = 8'h00;
+                    1:  get_test_data = 8'hFF;
+                    2:  get_test_data = 8'h55;
+                    3:  get_test_data = 8'hAA;
+                    4:  get_test_data = 8'h01;
+                    5:  get_test_data = 8'h80;
+                    6:  get_test_data = 8'h7F;
+                    7:  get_test_data = 8'hFE;
+                    8:  get_test_data = 8'h3C;
+                    9:  get_test_data = 8'hC3;
+                    10: get_test_data = 8'h0F;
+                    11: get_test_data = 8'hF0;
+                    12: get_test_data = 8'h12;
+                    13: get_test_data = 8'h21;
+                    14: get_test_data = 8'h96;
+                    default: get_test_data = 8'h69;
+                endcase
+            end
+            4: begin
+                case (index % 8)
+                    0: get_test_data = 8'h00;
+                    1: get_test_data = 8'hFF;
+                    2: get_test_data = 8'h55;
+                    3: get_test_data = 8'hAA;
+                    4: get_test_data = 8'h01 << ((index / 8) % 8);
+                    5: get_test_data = 8'h80 >> ((index / 8) % 8);
+                    6: get_test_data = 8'h0F;
+                    default: get_test_data = 8'hF0;
+                endcase
+            end
             default: get_test_data = 8'h00;  // 未定义模式使用 00。
         endcase
     end
@@ -102,6 +134,42 @@ task test_fifo_stream;
         run_safe_loopback_sequence(20, 2);  // 发送 20 个 pattern=2 的递增字节。
     end
 endtask  // test_fifo_stream 结束。
+
+// 中等长度混合序列：覆盖全零、全一、交替位、边界值和非对称数据。
+task test_multi16_byte;
+    begin
+        $display("\n[TEST] 混合顺序回环：16 字节 corner-value 序列");
+        uart_driver_apply_reset();
+        run_safe_loopback_sequence(16, 3);
+    end
+endtask  // test_multi16_byte 结束。
+
+// 较长递增流：用于展示跨多轮 FIFO 搬运的数据顺序保持。
+task test_stream64_byte;
+    begin
+        $display("\n[TEST] 长递增流回环：64 字节 00 至 3F");
+        uart_driver_apply_reset();
+        run_safe_loopback_sequence(64, 2);
+    end
+endtask  // test_stream64_byte 结束。
+
+// 深度流回归：128 字节覆盖多个 FIFO 周期和字节值范围。
+task test_stream128_byte;
+    begin
+        $display("\n[TEST] 深度递增流回环：128 字节 00 至 7F");
+        uart_driver_apply_reset();
+        run_safe_loopback_sequence(128, 2);
+    end
+endtask  // test_stream128_byte 结束。
+
+// 模式流覆盖交替数据、walking bit 与逻辑角落值，检查串行位序和数据完整性。
+task test_data_patterns;
+    begin
+        $display("\n[TEST] 数据模式回环：32 字节 alternating/walking/corner values");
+        uart_driver_apply_reset();
+        run_safe_loopback_sequence(32, 4);
+    end
+endtask  // test_data_patterns 结束。
 
 // 直接驱动独立 fifo_boundary_model：连续写 8 次检查 full，再连续读 8 次检查 empty。
 task test_rx_fifo_fill_level;
@@ -156,6 +224,15 @@ task test_reset_recovery;
     end
 endtask  // test_reset_recovery 结束。
 
+// 复位后不只验证单字节，而是验证一段混合数据流仍能被完整恢复和保持顺序。
+task test_reset_stream_recovery;
+    begin
+        $display("\n[TEST] 复位后混合流恢复：16 字节 corner-value 序列");
+        uart_driver_apply_reset();
+        run_safe_loopback_sequence(16, 3);
+    end
+endtask  // test_reset_stream_recovery 结束。
+
 // 从命令行读取 +TEST=<名称>；未指定时默认运行 all 完整回归。
 task run_selected_test;
     reg [8*16-1:0] selected_test;  // 最多容纳 16 个 ASCII 字符的测试名字符串。
@@ -171,16 +248,31 @@ task run_selected_test;
             test_multi_byte();           // 11/22/33/44 顺序回环。
         end else if (selected_test == "stream") begin
             test_fifo_stream();          // 00 至 13 递增序列回环。
+        end else if (selected_test == "multi16") begin
+            test_multi16_byte();         // 16 字节混合值顺序回环。
+        end else if (selected_test == "stream64") begin
+            test_stream64_byte();        // 64 字节递增流。
+        end else if (selected_test == "stream128") begin
+            test_stream128_byte();       // 128 字节递增流。
+        end else if (selected_test == "patterns") begin
+            test_data_patterns();        // 32 字节模式流。
         end else if (selected_test == "fifo") begin
             test_rx_fifo_fill_level();   // 独立 FIFO 满空边界测试。
         end else if (selected_test == "reset") begin
             test_reset_recovery();       // 复位后恢复传输。
+        end else if (selected_test == "reset_stream") begin
+            test_reset_stream_recovery(); // 复位后 16 字节混合流恢复。
         end else if (selected_test == "all") begin
             test_single_byte();          // 共检查 1 个 UART 字节。
             test_multi_byte();           // 共检查 4 个 UART 字节。
             test_fifo_stream();          // 共检查 20 个 UART 字节。
+            test_multi16_byte();         // 共检查 16 个 UART 字节。
+            test_stream64_byte();        // 共检查 64 个 UART 字节。
+            test_stream128_byte();       // 共检查 128 个 UART 字节。
+            test_data_patterns();        // 共检查 32 个 UART 字节。
             test_rx_fifo_fill_level();   // 直接检查 FIFO 的满空边界。
             test_reset_recovery();       // 再检查 1 个 UART 字节。
+            test_reset_stream_recovery(); // 再检查 16 个 UART 字节。
         end else begin
             total_errors = total_errors + 1;  // 未支持名称属于测试配置错误。
             $display("[TEST][FAIL] 不支持的 TEST=%0s", selected_test);

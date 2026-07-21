@@ -38,21 +38,23 @@ class PlatformService:
         self._progress_versions: dict[str, int] = {}
 
     def bootstrap(self) -> Project:
-        """Create the UART FIFO project and verification-plan cases on first startup."""
+        """Create the UART FIFO project and add any missing verification-plan cases."""
 
         existing = self.repository.list_projects()
         if existing:
-            return existing[0]
-        project = self.repository.create_project(
-            name="UART FIFO Verification",
-            description="UART RX -> FIFO -> loopback -> UART TX module-level verification platform.",
-            version="main",
-            created_at=utc_now(),
-        )
-        for case in TEST_CASES:
-            self.repository.create_testcase(
-                project.id, case.name, case.description, case.owner, case.expected_checks
+            project = existing[0]
+        else:
+            project = self.repository.create_project(
+                name="UART FIFO Verification",
+                description="UART RX -> FIFO -> loopback -> UART TX module-level verification platform.",
+                version="main",
+                created_at=utc_now(),
             )
+        for case in TEST_CASES:
+            if not self.repository.get_testcase_by_name(project.id, case.name):
+                self.repository.create_testcase(
+                    project.id, case.name, case.description, case.owner, case.expected_checks
+                )
         return project
 
     def list_projects(self) -> list[Project]:
