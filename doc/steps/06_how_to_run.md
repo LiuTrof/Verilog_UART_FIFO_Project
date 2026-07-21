@@ -2,7 +2,8 @@
 
 ## 运行命令
 
-在 `Verilog_UART_FIFO_0524` 目录下使用统一入口：
+在 `Verilog_UART_FIFO_0524` 目录下使用统一 UVM 入口。需要 VCS、Questa/ModelSim
+（含 UVM）或 Xcelium；Icarus Verilog 不能执行标准 UVM class-based testbench。
 
 ```bash
 ./run.sh single
@@ -38,11 +39,12 @@ sim/uart_fifo_sim/log/<场景名>.log
 当前仿真结果：
 
 ```text
-CHECKED BYTE : 26
-ERROR        : 0
-RESULT       : TEST PASS
+已检查字节数 : 26
+未匹配预期数 : 0
+当前错误数   : 0
+结果         : TEST PASS
 ```
 
 ## 小白要记住的点
 
-每次改 testbench 或 RTL 后，都要重新编译和运行。验证工程师的基本动作是：修改、仿真、看 log、必要时看波形。
+每次改 testbench 或 RTL 后，都要重新编译和运行。验证工程师的基本动作是：修改、仿真、看日志、必要时看波形。推荐先运行 `./run.sh single` 快速验证，再运行 `./run.sh all` 做完整回归。

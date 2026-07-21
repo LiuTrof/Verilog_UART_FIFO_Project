@@ -1,186 +1,99 @@
-# UART FIFO Verification Project
+# UART FIFO 模块级验证项目
 
-## 1. Project Overview
+这是一个基于 Verilog 的 UART + FIFO 回环验证项目。项目不修改原有 RTL 功能，而是在其外部搭建了可重复运行、自检和波形定位的 UVM 模块级验证环境。
 
-这是一个基于 Verilog 的 UART + FIFO 回环验证项目。项目目标不是只把 GitHub RTL 跑起来，而是把它整理成一个面向数字 IC 验证岗位的项目：有清晰目录、有 testbench、有自动检查、有 FIFO 边界测试、有文档记录。
+当前完整回归包含 10 个场景、282 个 UART 端到端字节检查，覆盖单字节、多字节、20/64/128 字节递增流、数据模式、FIFO 边界与复位恢复。请使用支持 UVM 1.2 的仿真器执行标准 UVM 回归；平台在无商用仿真器时提供明确标记的 Icarus 兼容自检回归。
 
-当前验证结果：
+## 设计与验证架构
 
-```text
-CHECKED BYTE : 26
-ERROR        : 0
-RESULT       : TEST PASS
-```
+![UART FIFO 回环：设计数据路径与验证数据路径](doc/images_cn/uart_fifo_loopback_architecture.png)
 
-## 2. DUT Architecture
-
-当前 loopback 数据链路：
+设计数据路径：
 
 ```text
-UART RX serial input
-        |
-        v
-    UART Receiver
-        |
-        v
-      RX FIFO
-        |
-        v
-  Top Loopback Logic
-        |
-        v
-      TX FIFO
-        |
-        v
-   UART Transmitter
-        |
-        v
-UART TX serial output
+UART RX 串行输入
+  -> UART 接收器
+  -> RX FIFO
+  -> 顶层回环搬运逻辑
+  -> TX FIFO
+  -> UART 发送器
+  -> UART TX 串行输出
 ```
 
-RTL 入口：
+验证数据路径：Driver 将字节编码成 `rx` 串行帧，同时把预期字节写入 Scoreboard 队列；
+Monitor 只从 `tx` 端独立解码实际字节；Scoreboard 按顺序比较预期与实际并输出 PASS/FAIL。
 
-```text
-rtl/uart.v
-rtl/fifo.v
-rtl/uart_fifo.v
-rtl/top_looptest.v
-```
+## 当前代码结构
 
-原 Vivado 风格源码仍保留在：
+| 文件 | 作用 |
+| --- | --- |
+| `rtl/top_looptest.v` | DUT 顶层；控制 RX FIFO 到 TX FIFO 的数据搬运。 |
+| `rtl/uart_fifo.v` | UART 与 RX/TX 双 FIFO 的封装。 |
+| `rtl/uart.v` | 波特率发生器、UART 发送器、UART 接收器。 |
+| `rtl/fifo.v` | 可复用 FIFO；包含存储阵列与指针/满空控制。 |
+| `tb/uvm/tb_top_loop_test_uvm.sv` | UVM 顶层；时钟、DUT、接口绑定、VCD 与 `run_test()` 入口。 |
+| `tb/uvm/uart_fifo_if.sv` | UART、FIFO 边界和状态观测 virtual interface。 |
+| `tb/uvm/uart_fifo_pkg.sv` | UVM transaction、sequence、agent、scoreboard、checker、env 与 test。 |
+| `tb/tb_top_loop_test.v` | 保留的旧过程式 testbench，不再由 `run.sh` 编译。 |
+| `tb/driver/`、`tb/monitor/`、`tb/scoreboard.vh`、`tb/test_case.vh` | 保留的 task 版本，供学习对照，不再是默认验证入口。 |
 
-```text
-sources_1/new/
-```
+所有实际参与运行的 RTL/TB 文件都已添加中文文件头和逐段注释。系统化学习请从 [RTL 与 TB 初学者指南](doc/rtl_tb_beginner_guide.md) 开始。
 
-## 3. Verification Environment
+UVM 结构、文件职责和工具要求详见 [UVM 迁移说明](doc/changes/02_uvm_migration.md)。
 
-验证环境结构：
+## 测试场景
 
-```text
-tb/tb_top_loop_test.v       # testbench top
-tb/driver/uart_driver.vh    # serial stimulus and reset driver
-tb/monitor/uart_monitor.vh  # TX serial monitor and decoder
-tb/scoreboard.vh            # expected queue and automatic checker
-tb/test_case.vh             # test selection and test cases
-```
+| 场景 | 命令 | 激励与检查 |
+| --- | --- | --- |
+| `single` | `./run.sh single` | 单字节 `A5` 端到端回环。 |
+| `multi` | `./run.sh multi` | `11 22 33 44` 的数据一致性与顺序。 |
+| `stream` | `./run.sh stream` | 20 字节递增序列 `00` 至 `13`。 |
+| `multi16` | `./run.sh multi16` | 16 字节 corner value 序列：全零、全一、交替位、边界值与非对称值。 |
+| `stream64` | `./run.sh stream64` | 64 字节递增序列 `00` 至 `3F`。 |
+| `stream128` | `./run.sh stream128` | 128 字节递增序列 `00` 至 `7F`。 |
+| `patterns` | `./run.sh patterns` | 32 字节交替位、walking bit 和 corner value 模式。 |
+| `fifo` | `./run.sh fifo` | 独立 FIFO 连续写 8 次后的 `full`，读 8 次后的 `empty`。 |
+| `reset` | `./run.sh reset` | 复位后重新发送 `A5` 的功能恢复。 |
+| `reset_stream` | `./run.sh reset_stream` | 复位后 16 字节 corner value 流的功能恢复。 |
+| `all` | `./run.sh all` | 执行完整的 10 场景、282 字节检查回归。 |
 
-验证数据流：
+所有多字节流场景使用帧间保护间隔，因此验证的是当前设计覆盖范围内的数据一致性和顺序性，不是 FIFO 灌满后的极限吞吐压力测试。
 
-```text
-                 +-------------------------------+
-                 |           Testcase            |
-                 +---------------+---------------+
-                                 |
-                                 v
-                 +-------------------------------+
-                 | UART Driver                    |
-                 | drives rx and queues expected  |
-                 +---------------+---------------+
-                                 |
-                                 v
-                 +-------------------------------+
-                 | UART FIFO DUT                  |
-                 +---------------+---------------+
-                                 |
-                                 v
-                 +-------------------------------+
-                 | UART Monitor                   |
-                 | decodes tx serial frames       |
-                 +---------------+---------------+
-                                 |
-                                 v
-                 +-------------------------------+
-                 | Scoreboard                     |
-                 | expected queue vs actual bytes |
-                 +---------------+---------------+
-                                 |
-                                 v
-                              PASS / FAIL
-```
+## 运行仿真
 
-The scoreboard owns an ordered expected-data queue. The driver puts each byte
-into that queue before it transmits the serial frame. The monitor decodes each
-`tx` frame and gives the decoded byte to the scoreboard. A test fails on data
-mismatch, unexpected output, pending expected data, or an internal FIFO illegal
-state. GTKWave remains a separate waveform-debug aid and does not decide pass
-or fail.
-
-## 4. Verification Plan
-
-The detailed plan is in [`doc/verification_plan.md`](doc/verification_plan.md).
-
-| Scenario | Purpose                     | Stimulus               | Main checks                       |
-| -------- | --------------------------- | ---------------------- | --------------------------------- |
-| `single` | Basic UART loopback         | `A5`                   | `tx` equals `rx` byte             |
-| `multi`  | Ordered multi-byte loopback | `11 22 33 44`          | No loss or reordering             |
-| `stream` | Sequential streaming        | `00` through `13`      | 20 ordered matches                |
-| `fifo`   | FIFO boundary model         | 8 writes, then 8 reads | `full`, then `empty`              |
-| `reset`  | Reset recovery              | reset, then `A5`       | Normal loopback resumes           |
-| `all`    | Full regression             | All scenarios          | Zero errors, empty expected queue |
-
-## 5. Interfaces
-
-| Interface         | Direction    | Description                                             |
-| ----------------- | ------------ | ------------------------------------------------------- |
-| `clk`             | input        | 100 MHz design clock used by RTL and testbench.         |
-| `reset`           | input        | Active-high reset.                                      |
-| `rx`              | input        | UART serial input driven by the verification driver.    |
-| `tx`              | output       | UART serial output decoded by the verification monitor. |
-| `wr_en` / `rd_en` | FIFO control | Write/read enables used by the FIFO boundary model.     |
-| `full` / `empty`  | FIFO status  | FIFO flow-control state checked in the boundary test.   |
-| `wdata` / `rdata` | FIFO data    | FIFO write/read data paths.                             |
-
-## 6. Simulation
-
-Tools:
-
-```text
-Icarus Verilog
-GTKWave
-```
-
-Run a selected scenario from the project root:
+依赖工具：支持 UVM 1.2 的 SystemVerilog 仿真器（VCS、Questa/ModelSim 或 Xcelium）以及可选 GTKWave。Icarus Verilog 不支持标准 UVM 的 class-based 验证环境，不能用于当前入口。
 
 ```bash
 ./run.sh single
-./run.sh multi
-./run.sh stream
-./run.sh fifo
-./run.sh reset
 ./run.sh all
-```
-
-Each run writes a readable log under `sim/uart_fifo_sim/log/`, for example
-`sim/uart_fifo_sim/log/fifo.log`. Logs record test selection, driver activity,
-monitor observations, scoreboard results, and the final PASS/FAIL summary.
-
-To generate a VCD and open its matching GTKWave view for an individual scenario:
-
-```bash
 ./run.sh multi --wave
 ```
 
-Waveform export is optional because writing every clock transition makes long
-regressions unnecessarily slow. Use `--wave` for focused debug; use `all` for
-the normal self-checking regression.
+每次运行会将日志写入 `sim/uart_fifo_sim/log/<场景>.log`。`--wave` 会生成对应 VCD 并打开匹配的 GTKWave 视图；完整回归不导出波形，以避免长时间 VCD 影响运行速度。
 
-## 7. Learning Notes
+GTKWave 场景视图说明见 [gtkwave_views/README.md](gtkwave_views/README.md)。详细测试范围与通过标准见 [验证计划](doc/verification_plan.md)。
 
-每一步的处理思路都记录在：
+## 学习资料
 
-```text
-doc/steps/01_project_structure.md
-doc/steps/02_testbench_split.md
-doc/steps/03_test_cases.md
-doc/steps/04_scoreboard.md
-doc/steps/05_assertion.md
-doc/steps/06_how_to_run.md
-doc/waveform_causality.md
+- [RTL 与 TB 初学者指南](doc/rtl_tb_beginner_guide.md)：推荐三小时学习路径、逐文件职责和关键时序。
+- `doc/images_cn/`：新增中文架构图、UART 帧图、FIFO 指针图和自检流程图；PNG 可直接预览，SVG 可放大查看。
+- `doc/images/`：保留英文原始示意图，不做修改。
+- `doc/waveform_causality.md`：将 RTL 行为与波形现象对应起来。
+- `doc/steps/`：记录目录整理、testbench 拆分、用例、Scoreboard、检查和运行方式。
+
+## 验证平台工作台
+
+在原有 UVM 验证入口之上，新增了 [Chip DV Platform](dv_platform/README.md)：它将现有
+测试场景封装为结构化自动化回归，保存 JSON 报告和原始日志，并提供 FastAPI + SQLite 后端、
+React/TypeScript 工作台以及 VCD 信号索引。该平台不会修改 RTL，也不会将 Icarus 误称为
+UVM 仿真器；本机无商用 UVM 工具时，它使用保留的 legacy 自检入口作为明确标记的兼容回归。
+
+```bash
+python3 -m dv_platform.automation --cases fifo
 ```
 
-## 8. Interview Summary
+平台启动、API 与质量门禁见 [dv_platform/README.md](dv_platform/README.md)。
 
-可以这样介绍这个项目：
+## 项目概述
 
-> 我基于一个 UART FIFO RTL 搭建了模块级验证环境。验证部分包含 UART 激励生成、TX 端监测、scoreboard 自动比对，以及 FIFO full/empty 边界检查。测试覆盖了单字节、多字节连续传输、20 字节数据流、FIFO 边界和 reset recovery 场景。这个项目的重点是从“能跑 RTL”升级到“能自动验证 RTL”。
+> 基于 Verilog UART/FIFO RTL，完成 UART 收发器、FIFO 缓冲模块及顶层 loopback 数据通路分析，梳理 UART RX -> RX FIFO -> 顶层搬运逻辑 -> TX FIFO -> UART TX 的完整传输链路。在原有 task testbench 基础上，搭建 UVM 模块级自检验证环境：UART agent 的 Driver 和 Monitor 分别完成 `rx` 端激励生成与 `tx` 端采样恢复，Scoreboard 通过 analysis port 对预期与实际事务自动比对。保留单字节回环、多字节顺序、递增序列、FIFO `full/empty` 边界与 reset recovery 场景，并以支持 UVM 1.2 的仿真器执行场景化回归和波形分析。
